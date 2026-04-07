@@ -1,1256 +1,536 @@
-/**
- * SENTINEL PRO v6.1.3 - INTEGRATED EDITION
- * Integración con Termostato DS18B20 v5.2
- * ACS712 en PIN 34 | ESP32 + LCD I2C 16x2
- *
- * [OK] Flash protegida (cada 5 min)
- * [OK] Debug BT+Serial completo
- * [OK] Google Sheets con temp S1/S2 al arranque y corte
- * [OK] Anti-flicker 3 confirmaciones
- * [OK] Diagnostico automatico
- * [OK] Historial 8 ciclos
- * [OK] OTA por WiFi
- * [OK] Auto-Zero al encender
- * [OK] UI con pestanas Dashboard/Config
- * [OK] WiFi auto-reconnect
- * [OK] WDT compatible ESP-IDF v5.5
- * [OK] Comunicacion bidireccional con Termostato v5.2
- * [NEW] Interlock: Corte por temp critica del nodo
- * [NEW] Control Remoto: Toggle relay del termostato desde sentinel
- */
-#include <WiFi.h>
-#include <WiFiClientSecure.h>
-#include <WebServer.h>
-#include <LiquidCrystal_I2C.h>
-#include <Preferences.h>
-// #define ENABLE_BT // DESACTIVADO: Libera ~20KB RAM para soportar SSL Google Sheets
-
-#include <Wire.h>
-#ifdef ENABLE_BT
-#include <BluetoothSerial.h>
-#endif
-#include <HTTPClient.h>
-#include <Update.h>
-#include <time.h>
-#include <esp_task_wdt.h>
-
-#define PIN_SENSOR 34
-#define PIN_RELAY 25    // Pin para conectar el rele SSR de 25A
-#define PIN_BUZZER 26   // Pin para el buzzer activo
-#define WDT_TIMEOUT 15  // Elevado a 15s para dar margen a timeouts TCP/ARP nativos
-#define MAX_HISTORY 8
-#define PERSIST_INTERVAL 300000
-#define PIN_BUTTON 13   // Boton externo para resetear contador
-#define LOG_SIZE 600
-#define WIN 8
-
-static const esp_task_wdt_config_t wdt_cfg = {
-  .timeout_ms = WDT_TIMEOUT * 1000,
-  .idle_core_mask = 0,
-  .trigger_panic = true
-};
-
-LiquidCrystal_I2C lcd(0x27, 16, 2);
-WebServer server(80);
-Preferences prefs;
-#ifdef ENABLE_BT
-BluetoothSerial SerialBT;
-#endif
-
-struct Config {
-  String ssid, pass, gasId;
-  int zero;
-  float sens, trigAmp, cutoffAmp;
-  float stallAmp;
-  int stallTimeSec;
-  float overCurrentAmp;
-  int shortCycleSec;
-  bool protectMode, test24h;
-  String sheetId;
-  float minWorkAmp;
-  String nodeIPs;    
-  float maxTempSafety; // Corte por seguridad si el nodo supera esta temp
-} cfg;
-
-struct State {
-  float currentAmp, peakAmp;
-  unsigned long totalStarts, currentRunTime, lastRunDuration, bootTime;
-  bool isMotorOn, wifiModeAP, pendingPersist;
-  bool isStalled;
-  bool stallAlertSent;
-  bool overCurrentAlert;
-  String ipAddr;
-  int shortCycleStreak, lastRawAvg;
-  float lastRMS;
-  int stallCount;
-  bool protectionTripped;
-  unsigned long protectionTime;
-  float lastCutTemp1;   // Temperatura S1 del termostato al momento de corte
-  float lastCutTemp2;   // Temperatura S2 del termostato al momento de corte
-  float startTemp1;     // Temperatura S1 al arrancar el ciclo
-  float startTemp2;     // Temperatura S2 al arrancar el ciclo
-  int resetConfirmState; // 0: normal, 1: confirmacion 1, 2: confirmacion 2
-  unsigned long lastResetPress;
-  String bootReason;
-} sys;
-
-enum BuzzerEvent { BUZ_NONE, BUZ_BOOT, BUZ_STALL, BUZ_WIFI_DROP, BUZ_OK, BUZ_THERMO_ALERT };
-BuzzerEvent buzState = BUZ_NONE;
-unsigned long buzTimer = 0;
-int buzStep = 0;
-
-void triggerBuzzer(BuzzerEvent e) {
-  if (buzState == e && e != BUZ_WIFI_DROP && e != BUZ_OK) return; 
-  buzState = e;
-  buzStep = 0;
-  buzTimer = millis();
-}
-
-void updateBuzzer() {
-  unsigned long now = millis();
-  
-  // BOOT o TODO OK: 2 beeps rapidos y definidos
-  // Como es un buzzer activo, digitalWrite HIGH lo hace sonar.
-  if (buzState == BUZ_BOOT || buzState == BUZ_OK) {
-    if (buzStep == 0) { digitalWrite(PIN_BUZZER, HIGH); buzTimer = now; buzStep++; }
-    else if (buzStep == 1 && now - buzTimer > 100) { digitalWrite(PIN_BUZZER, LOW); buzTimer = now; buzStep++; }
-    else if (buzStep == 2 && now - buzTimer > 100) { digitalWrite(PIN_BUZZER, HIGH); buzTimer = now; buzStep++; }
-    else if (buzStep == 3 && now - buzTimer > 100) { digitalWrite(PIN_BUZZER, LOW); buzState = BUZ_NONE; }
-  }
-  // STALL: Beep largo repetitivo (Alarma de peligro)
-  else if (buzState == BUZ_STALL) {
-    if (buzStep == 0) { digitalWrite(PIN_BUZZER, HIGH); buzTimer = now; buzStep++; }
-    else if (buzStep == 1 && now - buzTimer > 800) { digitalWrite(PIN_BUZZER, LOW); buzTimer = now; buzStep++; }
-    else if (buzStep == 2 && now - buzTimer > 200) { buzStep = 0; } // repite hasta limpiar
-    if (!sys.isStalled && !sys.protectionTripped) { digitalWrite(PIN_BUZZER, LOW); buzState = BUZ_NONE; }
-  }
-  // WIFI DROP: 3 beeps de diferentes duraciones para emular alerta de bajada ("decrecendo")
-  // Ya que en un buzzer activo no podemos bajar el tono, variamos el patron.
-  else if (buzState == BUZ_WIFI_DROP) {
-    if (buzStep == 0) { digitalWrite(PIN_BUZZER, HIGH); buzTimer = now; buzStep++; }
-    else if (buzStep == 1 && now - buzTimer > 50) { digitalWrite(PIN_BUZZER, LOW); buzTimer = now; buzStep++; }
-    else if (buzStep == 2 && now - buzTimer > 80) { digitalWrite(PIN_BUZZER, HIGH); buzTimer = now; buzStep++; }
-    else if (buzStep == 3 && now - buzTimer > 150) { digitalWrite(PIN_BUZZER, LOW); buzTimer = now; buzStep++; }
-    else if (buzStep == 4 && now - buzTimer > 200) { digitalWrite(PIN_BUZZER, HIGH); buzTimer = now; buzStep++; }
-    else if (buzStep == 5 && now - buzTimer > 300) { digitalWrite(PIN_BUZZER, LOW); buzState = BUZ_NONE; }
-  }
-  else if (buzState == BUZ_THERMO_ALERT) {
-    if (buzStep == 0) { digitalWrite(PIN_BUZZER, HIGH); buzTimer = now; buzStep++; }
-    else if (buzStep == 1 && now - buzTimer > 300) { digitalWrite(PIN_BUZZER, LOW); buzTimer = now; buzStep++; }
-    else if (buzStep == 2 && now - buzTimer > 300) { buzStep = 0; }
-  }
-}
-
-struct CycleRecord { unsigned long duration; float maxAmp; float peakAmp; bool wasShort; bool wasStall; };
-CycleRecord cycleHistory[MAX_HISTORY];
-int cycleIdx = 0, cycleCount = 0;
-
-float ampBuf[WIN]; int ampIdx = 0;
-char logBuffer[LOG_SIZE]; int logLen = 0;
-const char* ntpServer = "ar.pool.ntp.org";
-const long gmtOffset = -10800;
-String diagMsg = "Esperando datos...";
-unsigned long totalOnTime = 0, lastOnCheck = 0;  // Para duty cycle
-
-// === DEBUG BT + SERIAL ===
-void fullDebug(const char* tag, const char* msg) {
-  char buf[180];
-  snprintf(buf, sizeof(buf), "[%s] %s | A:%.2f | Raw:%d | RMS:%.1f | RAM:%lu | M:%s | T:%lu",
-    tag, msg, sys.currentAmp, sys.lastRawAvg, sys.lastRMS,
-    (unsigned long)ESP.getFreeHeap(), sys.isMotorOn ? "ON" : "OFF", sys.totalStarts);
-  Serial.println(buf);
-  #ifdef ENABLE_BT
-  SerialBT.println(buf);
-  #endif
-}
-
-// === HTML con pestanas (strings concatenados, sin rawliteral) ===
-const char HTML_MANUAL[] PROGMEM = "";
-
-const char HTML_PAGE[] PROGMEM =
-"<!DOCTYPE html><html lang='es'><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
-"<title>Sentinel Pro v6.1.3</title><script src='https://cdn.jsdelivr.net/npm/chart.js'></script>"
-"<style>"
-":root{--p:#0d6efd;--r:#dc3545;--bg:#f0f2f5;--c:#fff;--t:#212529;--m:#6c757d}"
-"*{box-sizing:border-box;margin:0}"
-"body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--t);padding:12px}"
-".nav{display:flex;gap:8px;margin-bottom:14px;background:var(--c);padding:10px;border-radius:12px;box-shadow:0 2px 6px rgba(0,0,0,.06)}"
-".nav button{flex:1;padding:11px;border:none;border-radius:8px;cursor:pointer;font-weight:700;background:#f0f0f0;transition:.2s;font-size:.85em}"
-".nav button.ac{background:var(--p);color:#fff}"
-".sec{display:none}.sec.ac{display:block}"
-".cd{background:var(--c);padding:16px;border-radius:12px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,.05);border:1px solid #e9ecef}"
-".lb{font-size:.7em;color:var(--m);text-transform:uppercase;letter-spacing:1px;font-weight:700;margin-bottom:4px}"
-".vl{font-size:2.8em;font-weight:800;color:var(--p);line-height:1}"
-".sm{font-size:.82em;color:var(--m);margin-top:5px}"
-".on{color:var(--p);animation:pulse 1.5s infinite}@keyframes pulse{50%{opacity:.4}}"
-".g2{display:grid;grid-template-columns:1fr 1fr;gap:12px}"
-".diag{border-radius:8px;padding:12px;font-size:.85em;margin-bottom:12px}"
-".diag.w{background:#fff3cd;border:1px solid #ffecb5;color:#664d03}"
-".diag.ok{background:#d1e7dd;border:1px solid #badbcc;color:#0f5132}"
-".diag.er{background:#f8d7da;border:1px solid #f5c2c7;color:#842029}"
-".log{font-family:Consolas,monospace;background:#f8f9fa;padding:8px;height:90px;overflow-y:auto;font-size:.72em;border:1px solid #dee2e6;border-radius:6px;white-space:pre-wrap}"
-".dbg{font-family:Consolas,monospace;font-size:.68em;color:var(--m);background:#f8f9fa;padding:6px;border-radius:4px;margin-top:8px}"
-"input[type=text],input[type=number],input[type=password]{width:100%;padding:10px;border:1px solid #ced4da;border-radius:6px;font-size:.9em;margin-top:2px}"
-"input:focus{border-color:var(--p);outline:0;box-shadow:0 0 0 3px rgba(13,110,253,.15)}"
-"label{display:block;font-size:.78em;font-weight:600;color:#495057;margin-bottom:2px;margin-top:10px}"
-".ht{font-size:.65em;color:#999;margin-top:1px;font-style:italic}"
-".sep{border:0;border-top:1px solid #eee;margin:18px 0}"
-".sec-title{font-size:.8em;font-weight:700;color:var(--p);text-transform:uppercase;letter-spacing:1px;margin:14px 0 6px;padding-left:2px}"
-".btn{width:100%;padding:12px;border:none;border-radius:8px;font-weight:700;cursor:pointer;margin-top:10px;transition:.15s}"
-".bp{background:var(--p);color:#fff}.bp:hover{background:#0b5ed7}"
-".bs{background:var(--m);color:#fff;font-size:.82em}.bs:hover{background:#565e64}"
-".br{background:var(--r);color:#fff;font-size:.82em}.br:hover{background:#bb2d3b}"
-".bo{background:#e67e22;color:#fff;font-size:.82em}.bo:hover{background:#d35400}"
-".btn-premium{display:block;text-align:center;padding:15px;background:linear-gradient(135deg,var(--p),#0b5ed7);color:#fff;text-decoration:none;border-radius:12px;font-weight:700;font-size:1em;margin-top:10px;box-shadow:0 8px 16px rgba(13,110,253,0.25);transition:.3s}.btn-premium:hover{transform:translateY(-2px);box-shadow:0 12px 20px rgba(13,110,253,0.35);color:#fff}.btn-sheet{background:linear-gradient(135deg,#198754,#157347);box-shadow:0 8px 16px rgba(25,135,84,0.25)}.btn-sheet:hover{box-shadow:0 12px 20px rgba(25,135,84,0.35)}@media(max-width:500px){.g2{grid-template-columns:1fr}.vl{font-size:2.2em}}"
-"</style></head><body>"
-"<div class='nav'>"
-"<button id='b1' class='ac' onclick=\"T('d')\">DASHBOARD</button>"
-"<button id='b2' onclick=\"location.href='/config'\">CONFIG</button>"
-"<button id='b3' onclick=\"T('o')\">OTA</button>"
-"</div>"
-// --- DASHBOARD ---
-"<div id='d' class='sec ac'>"
-"<div id='dash_lnk'></div>"
-"<div class='g2'>"
-"<div class='cd'><div class='lb'>CORRIENTE RMS</div><div class='vl' id='amp'>0.0</div><div class='sm' id='st'>Standby</div></div>"
-"<div class='cd'><div class='lb'>CICLOS VALIDOS <span id='clk' style='float:right;color:#0d6efd'>--:--:--</span></div><div class='vl' id='tot' style='color:#198754'>0</div><div class='sm'>Ultimo: <b id='ld'>0</b>s - Up: <span id='up'>0h</span></div></div>"
-"</div>"
-"<div class='cd' id='thermo-card' style='margin-bottom:12px;display:none'>"
-"<div class='lb'>🌡 TERMOSTATO <span id='thermo-status' style='float:right'></span></div>"
-"<div class='g2' style='margin-top:8px'>"
-"<div><div class='lb' style='color:#17a2b8'>SENSOR 1</div><div id='t1-arr' style='font-size:1.1em;font-weight:700;color:#17a2b8'>--</div><div style='font-size:0.7em;color:#6c757d'>Arranque &rarr; Corte</div></div>"
-"<div><div class='lb' style='color:#fd7e14'>SENSOR 2</div><div id='t2-arr' style='font-size:1.1em;font-weight:700;color:#fd7e14'>--</div><div style='font-size:0.7em;color:#6c757d'>Arranque &rarr; Corte</div></div>"
-"</div></div>"
-"<div class='g2'>"
-"<div class='cd'><div class='lb'>PICO MAXIMO</div><div class='vl' id='pk' style='color:#e67e22;font-size:1.8em'>0.0A</div><div class='sm'>Inrush del ultimo arranque</div></div>"
-"<div class='cd'><div class='lb'>DUTY CYCLE</div><div class='vl' id='dc' style='color:#6f42c1;font-size:1.8em'>0%</div><div class='sm' id='stalls'>Stalls: 0</div></div>"
-"</div>"
-"<div id='dg' class='diag w'>Analizando...</div>"
-"<button id='rearmBtn' class='btn br' style='display:none;margin-bottom:12px;font-size:1.1em;padding:15px;' onclick=\"doReq('/rearm', '¡Sistema rearmado!')\">&#9888; REARMAR AHORA &#9888;</button>"
-"<div class='g2'>"
-"<div class='cd'><div class='lb'>Amperaje Real-Time</div><canvas id='cRT' height='75'></canvas></div>"
-"<div class='cd'><div class='lb'>Historial Ciclos</div><canvas id='cH' height='75'></canvas></div>"
-"</div>"
-"<div class='cd'><div class='lb'>Log de Eventos</div><div class='log' id='logB'></div>"
-"<div class='dbg' id='dbg'>RAW:-- RMS:-- RAM:-- Z:--</div>"
-"<div style='font-size:0.65em;color:#999;margin-top:6px;text-align:right'>Último Inicio: <b id='br_val'>--</b></div></div>"
-"<a href='https://byte-electroniclab.github.io/manual-sentinel/' target='_blank' class='btn-premium'>📖 VER MANUAL PREMIUM (v6.1.3)</a>"
-"<div id='nodes-container'></div>"
-"</div>"
-// --- OTA ---
-"<div id='o' class='sec'><div class='cd'>"
-"<div class='lb'>OTA - Actualizar Firmware</div>"
-"<form method='POST' action='/update' enctype='multipart/form-data'>"
-"<input type='file' name='firmware' accept='.bin' style='margin:10px 0'>"
-"<button class='btn br'>SUBIR FIRMWARE (.bin)</button></form>"
-"</div></div>"
-// --- SCRIPT ---
-"<script>"
-"function T(id){document.querySelectorAll('.sec').forEach(function(e){e.classList.remove('ac')});"
-"document.querySelectorAll('.nav button').forEach(function(e){e.classList.remove('ac')});"
-"document.getElementById(id).classList.add('ac');"
-"var m={'d':'b1','c':'b2','o':'b3'};document.getElementById(m[id]).classList.add('ac');}"
-"function doReq(url, msg){fetch(url).then(function(r){if(msg)alert(msg);location.reload();}).catch(function(){alert('Error');});}"
-"var cRT=null,cH=null;if(typeof Chart!=='undefined'){"
-"cRT=new Chart(document.getElementById('cRT'),{type:'line',data:{labels:Array(30).fill(''),datasets:[{data:Array(30).fill(0),borderColor:'#0d6efd',backgroundColor:'rgba(13,110,253,.08)',borderWidth:1.5,pointRadius:0,fill:true,tension:.3}]},options:{animation:false,scales:{x:{display:false},y:{beginAtZero:true,grid:{color:'#f1f3f5'}}},plugins:{legend:{display:false}}}});"
-"cH=new Chart(document.getElementById('cH'),{type:'bar',data:{labels:[],datasets:[{data:[],backgroundColor:[],borderRadius:4}]},options:{animation:false,scales:{x:{display:false},y:{beginAtZero:true,grid:{color:'#f1f3f5'}}},plugins:{legend:{display:false}}}});}"
-"var ff=false;"
-"function upd(){fetch('/api').then(function(r){return r.json()}).then(function(d){"
-"document.getElementById('amp').innerText=d.a.toFixed(2);"
-"document.getElementById('clk').innerText=d.time;"
-"document.getElementById('tot').innerText=d.t;"
-"document.getElementById('pk').innerText=d.peak.toFixed(1)+'A';"
-"document.getElementById('dc').innerText=d.duty+'%';"
-"document.getElementById('stalls').innerText='Stalls: '+d.stalls;"
-"document.getElementById('ld').innerText=d.ld;"
-"document.getElementById('up').innerText=d.up;"
-"document.getElementById('logB').innerText=d.log;"
-"document.getElementById('br_val').innerText=d.br;"
-"document.getElementById('dbg').innerText='RAW:'+(d.dbg.raw||0)+' RMS:'+d.dbg.rms.toFixed(1)+' RAM:'+d.dbg.ram+' Z:'+d.cf.zero;"
-"var st=document.getElementById('st');"
-"if(d.stalled){st.innerText='!! MOTOR CLAVADO ('+d.rt+'s)';st.className='sm on';st.style.color='#dc3545'}"
-"else if(d.on){st.innerText='MOTOR ON ('+d.rt+'s)';st.className='sm on';st.style.color=''}"
-"else{st.innerText='Standby';st.className='sm';st.style.color=''}"
-"var tc=document.getElementById('thermo-card');"
-"if(d.cutTemp1>0||d.stTemp1>0||d.cutTemp2>0||d.stTemp2>0){"
-"tc.style.display='block';"
-"document.getElementById('t1-arr').innerHTML=d.stTemp1.toFixed(1)+'&deg;C &rarr; '+d.cutTemp1.toFixed(1)+'&deg;C';"
-"document.getElementById('t2-arr').innerHTML=d.stTemp2.toFixed(1)+'&deg;C &rarr; '+d.cutTemp2.toFixed(1)+'&deg;C';"
-"}else{tc.style.display='none';}"
-"var dg=document.getElementById('dg');dg.innerText=d.diag;"
-"if(d.diag.indexOf('OK')==0)dg.className='diag ok';else if(d.diag.indexOf('ALERTA')==0)dg.className='diag er';else dg.className='diag w';"
-"document.getElementById('rearmBtn').style.display = d.tripped ? 'block' : 'none';"
-"var lnkDiv=document.getElementById('dash_lnk');"
-"if(d.cf.sid && d.cf.sid.length>5) {"
-"  var sid = d.cf.sid; if(sid.includes('/d/')) sid = sid.split('/d/')[1].split('/')[0];"
-"  lnkDiv.innerHTML=\"<a href='https://docs.google.com/spreadsheets/d/\"+sid+\"/edit' target='_blank' class='btn-premium btn-sheet'>📊 REVISAR PLANILLA GOOGLE SHEETS &rarr;</a>\";"
-"} else { lnkDiv.innerHTML=''; }"
-"if(!ff){"
-"var s=document.getElementById('i_s');if(s)s.value=d.cf.ssid;"
-"var g=document.getElementById('i_g');if(g)g.value=d.cf.gas;"
-"var is=document.getElementById('i_sid');if(is)is.value=d.cf.sid;"
-"var iz=document.getElementById('i_z');if(iz)iz.value=d.cf.zero;"
-"var ie=document.getElementById('i_e');if(ie)ie.value=d.cf.sens;"
-"var itr=document.getElementById('i_tr');if(itr)itr.value=d.cf.trig;"
-"var ish=document.getElementById('i_sh');if(ish)ish.value=d.cf.sh;"
-"var isa=document.getElementById('i_sa');if(isa)isa.value=d.cf.sa;"
-"var ist=document.getElementById('i_st');if(ist)ist.value=d.cf.st;"
-"var imw=document.getElementById('i_minwa');if(imw)imw.value=d.cf.minwa;"
-"var ioc=document.getElementById('i_oc');if(ioc)ioc.value=d.cf.oc;"
-"var itip=document.getElementById('i_tip');if(itip)itip.value=d.cf.nodeIPs;"
-"var imts=document.getElementById('i_mts');if(imts)imts.value=d.cf.mts;"
-"var ipr=document.getElementById('i_pr');if(ipr)ipr.checked=d.cf.prot;"
-"var ite=document.getElementById('i_te');if(ite)ite.checked=d.cf.test;"
-"ff=true;}"
-"if(cRT){cRT.data.datasets[0].data.push(d.a);cRT.data.datasets[0].data.shift();cRT.update();}"
-"if(cH&&d.hist&&d.hist.length>0){cH.data.labels=[];cH.data.datasets[0].data=[];cH.data.datasets[0].backgroundColor=[];"
-"for(var i=0;i<d.hist.length;i++){cH.data.labels.push('#'+(i+1));cH.data.datasets[0].data.push(d.hist[i].d);"
-"cH.data.datasets[0].backgroundColor.push(d.hist[i].s?'rgba(220,53,69,.6)':'rgba(13,110,253,.6)');}cH.update();}"
-"}).catch(function(e){console.log(e);});}"
-"function fetchNode(ip){if(!ip||ip.length<7)return;"
-"fetch('http://'+ip+'/node-info').then(function(r){return r.json()}).then(function(d){"
-"var c=document.getElementById('n_'+ip);if(!c){c=document.createElement('div');c.id='n_'+ip;c.className='cd';c.style.marginTop='12px';document.getElementById('nodes-container').appendChild(c);}"
-"var h='<div class=\"lb\">NODO: '+d.node_id.toUpperCase()+' ['+d.ip+'] <span style=\"float:right;color:#198754\">Online</span></div>';"
-"h+='<div class=\"g2\" style=\"margin-top:8px\">';"
-"if(d.node_type==\"thermostat\"){h+='<div><div class=\"lb\">TEMP S1</div><div class=\"vl\" style=\"color:#17a2b8;font-size:1.8em\">'+(d.data.temp1_c||0).toFixed(1)+'C</div></div>';"
-"h+='<div><div class=\"lb\">TEMP S2</div><div class=\"vl\" style=\"color:#fd7e14;font-size:1.8em\">'+(d.data.temp2_c||0).toFixed(1)+'C</div></div>';"
-"h+='</div><div class=\"sm\" style=\"margin-top:6px\">Relay: '+(d.data.relay_on?\"ON\":\"OFF\")+' | Obj: '+(d.data.target_temp_c||0)+'C'+(d.data.alert_active?' | !! ALERTA':'')+'</div>';"
-"h+='<button class=\"btn bp\" style=\"margin-top:8px;padding:6px;font-size:0.8em;background:#6f42c1\" onclick=\"fetch(\\'http://'+ip+'/toggle-relay\\').then(()=>alert(\\'Comando Enviado a NODO\\'))\">CONTROL REMOTO RELAY</button>';"
-"}else if(d.node_type=='motor_monitor'){"
-"h+='<div><div class=\"lb\">CORRIENTE</div><div class=\"vl\" style=\"color:#0d6efd;font-size:1.8em\">'+(d.data.current_amp||0).toFixed(2)+'A</div></div>';"
-"h+='<div><div class=\"lb\">ESTADO</div><div class=\"vl\" style=\"color:'+(d.data.motor_on?'#198754':'#6c757d')+';font-size:1.8em\">'+(d.data.motor_on?'ON':'OFF')+'</div></div>';"
-"h+='</div><div class=\"sm\" style=\"margin-top:6px\">'+(d.data.diagnostics||'')+'</div>';}else{h+='</div>';}c.innerHTML=h;"
-"}).catch(function(){});}"
-"setInterval(upd,1200);"
-"fetch('/net-cfg').then(function(r){return r.json()}).then(function(d){if(d.nodeIPs){d.nodeIPs.split(',').forEach(function(ip){ip=ip.trim();if(ip){fetchNode(ip);setInterval(function(){fetchNode(ip);},4000);}})}}).catch(function(){});"
-"</script></body></html>";
-
-// === FUNCIONES CORE ===
-void loadConfig() {
-  prefs.begin("sp", false);
-  cfg.ssid = prefs.getString("ssid", "Hacker WiFi 2.4Ghz");
-  cfg.pass = prefs.getString("pass", "15418045");
-  cfg.gasId = prefs.getString("gas", "");
-  cfg.sheetId = prefs.getString("sid", "");
-  cfg.zero = prefs.getInt("zero", 1862);
-  cfg.sens = prefs.getFloat("sens", 0.0264);
-  cfg.trigAmp = prefs.getFloat("trig", 0.8);
-  cfg.stallAmp = prefs.getFloat("stall", 4.0);
-  cfg.stallTimeSec = prefs.getInt("stallt", 15);
-  cfg.overCurrentAmp = prefs.getFloat("overcur", 8.0);
-  cfg.shortCycleSec = prefs.getInt("short", 8);
-  cfg.protectMode = prefs.getBool("prot", true);
-  cfg.test24h = prefs.getBool("test", false);
-  cfg.minWorkAmp = prefs.getFloat("minwa", 1.5);
-  cfg.nodeIPs = prefs.getString("thermoIP", "192.168.1.80");
-  cfg.maxTempSafety = prefs.getFloat("mts", 55.0);
-  sys.totalStarts = prefs.getULong("starts", 0);
-  prefs.end();
-  cfg.cutoffAmp = cfg.trigAmp * 0.3;
-}
-
-void saveAllConfig() {
-  prefs.begin("sp", false);
-  prefs.putString("ssid", cfg.ssid);
-  prefs.putString("pass", cfg.pass);
-  prefs.putString("gas", cfg.gasId);
-  prefs.putString("sid", cfg.sheetId);
-  prefs.putInt("zero", cfg.zero);
-  prefs.putFloat("sens", cfg.sens);
-  prefs.putFloat("trig", cfg.trigAmp);
-  prefs.putFloat("stall", cfg.stallAmp);
-  prefs.putInt("stallt", cfg.stallTimeSec);
-  prefs.putFloat("overcur", cfg.overCurrentAmp);
-  prefs.putInt("short", cfg.shortCycleSec);
-  prefs.putBool("prot", cfg.protectMode);
-  prefs.putBool("test", cfg.test24h);
-  prefs.putFloat("minwa", cfg.minWorkAmp);
-  prefs.putString("thermoIP", cfg.nodeIPs);
-  prefs.putFloat("mts", cfg.maxTempSafety);
-  prefs.end();
-}
-
-// Consulta el /node-info de los nodos y guarda la temp del termostato
-void fetchThermoTemp(bool isStartEvent) {
-  esp_task_wdt_reset();
-  if (sys.wifiModeAP || cfg.nodeIPs.length() < 7) return;
-  
-  String ips = cfg.nodeIPs;
-  int startIdx = 0;
-  
-  while (startIdx < ips.length()) {
-    int commaIdx = ips.indexOf(',', startIdx);
-    if (commaIdx == -1) commaIdx = ips.length();
-    String ip = ips.substring(startIdx, commaIdx);
-    ip.trim();
-    startIdx = commaIdx + 1;
-    
-    if (ip.length() < 7) continue;
-    
-    HTTPClient http;
-    WiFiClient wc;
-    http.begin(wc, "http://" + ip + "/node-info");
-    http.setTimeout(1500);         // Timeout de lectura (recv)
-    http.setConnectTimeout(1500);  // Timeout critico de conexion inicial TCP/ARP (Evita crash del WDT)
-    int code = http.GET();
-    if (code == 200) {
-      String body = http.getString();
-      if (body.indexOf("\"thermostat\"") > 0) {
-        int i1 = body.indexOf("\"temp1_c\":");
-        if (i1 >= 0) {
-          float t1 = body.substring(i1 + 10).toFloat();
-          if (isStartEvent) sys.startTemp1 = t1; else sys.lastCutTemp1 = t1;
-          // Interlock de Seguridad: Corte por temp critica en Nodo
-          if (t1 > cfg.maxTempSafety && sys.isMotorOn && !sys.protectionTripped) {
-             sys.protectionTripped = true;
-             sys.protectionTime = millis();
-             prefs.begin("sp", false); prefs.putBool("tripped", true); prefs.end();
-             digitalWrite(PIN_RELAY, LOW); 
-             addLog("RELE: CORTE POR SEGURIDAD NODO");
-             triggerBuzzer(BUZ_STALL);
-          }
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sentinel Pro v6.1.3 | Documentación Oficial Premium</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #00aaff;
+            --primary-glow: rgba(0, 170, 255, 0.4);
+            --secondary: #00ffcc;
+            --accent: #f59e0b;
+            --danger: #ef4444;
+            --success: #10b981;
+            --dark-bg: #020617;
+            --card-bg: rgba(15, 23, 42, 0.6);
+            --text-main: #f8fafc;
+            --text-dim: #94a3b8;
+            --border: rgba(255, 255, 255, 0.1);
+            --glass-bg: rgba(255, 255, 255, 0.02);
         }
-        int i2 = body.indexOf("\"temp2_c\":");
-        if (i2 >= 0) {
-          float t2 = body.substring(i2 + 10).toFloat();
-          if (isStartEvent) sys.startTemp2 = t2; else sys.lastCutTemp2 = t2;
-          // Check sensor 2 tambien para interlock
-          if (t2 > cfg.maxTempSafety && sys.isMotorOn && !sys.protectionTripped) {
-             sys.protectionTripped = true;
-             sys.protectionTime = millis();
-             prefs.begin("sp", false); prefs.putBool("tripped", true); prefs.end();
-             digitalWrite(PIN_RELAY, LOW); 
-             addLog("RELE: CORTE POR SEGURIDAD S2 NODO");
-             triggerBuzzer(BUZ_STALL);
-          }
+
+        * {
+            box-sizing: border-box;
+            -webkit-font-smoothing: antialiased;
         }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--dark-bg);
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(0, 170, 255, 0.05) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(0, 255, 204, 0.05) 0%, transparent 40%);
+            color: var(--text-main);
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+        }
+
+        /* --- PORTADA --- */
+        .cover {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 20px;
+            position: relative;
+            background: radial-gradient(circle at center, #0f172a 0%, #020617 100%);
+        }
+
+        .brand-badge {
+            background: rgba(0, 170, 255, 0.1);
+            border: 1px solid var(--primary);
+            color: var(--primary);
+            padding: 8px 20px;
+            border-radius: 100px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            margin-bottom: 30px;
+            backdrop-filter: blur(5px);
+        }
+
+        .logo-box {
+            width: 120px;
+            height: 120px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border-radius: 30px;
+            margin-bottom: 40px;
+            box-shadow: 0 0 50px var(--primary-glow);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 3rem;
+            color: white;
+            font-weight: 800;
+        }
+
+        .cover h1 {
+            font-size: 4rem;
+            font-weight: 800;
+            margin: 0;
+            letter-spacing: -3px;
+            background: linear-gradient(to right, #fff, #94a3b8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .cover .version {
+            font-size: 1.5rem;
+            color: var(--primary);
+            font-weight: 600;
+            margin-top: 10px;
+        }
+
+        .cover p {
+            max-width: 600px;
+            color: var(--text-dim);
+            font-size: 1.1rem;
+            margin-top: 25px;
+        }
+
+        /* --- CONTENEDOR GENERAL --- */
+        .content {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 60px 20px;
+        }
+
+        /* --- CRUMBS / NAVIGATION --- */
+        .nav-info {
+            color: var(--primary);
+            font-size: 0.8rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            margin-bottom: 20px;
+        }
+
+        h2 {
+            font-size: 2.8rem;
+            font-weight: 800;
+            margin-bottom: 40px;
+            letter-spacing: -1px;
+        }
+
+        h3 {
+            font-size: 1.8rem;
+            color: var(--primary);
+            margin-top: 60px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .chapter-num {
+            background: var(--primary);
+            color: var(--dark-bg);
+            width: 35px;
+            height: 35px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            font-weight: 800;
+        }
+
+        /* --- CARDS --- */
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 40px;
+            margin-bottom: 40px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+        }
+
+        .toc-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .toc-item {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            padding: 15px 0;
+            border-bottom: 1px solid var(--border);
+            text-decoration: none;
+            color: var(--text-main);
+            transition: 0.3s;
+        }
+
+        .toc-item:hover {
+            transform: translateX(10px);
+            color: var(--primary);
+        }
+
+        .toc-num {
+            background: #1e293b;
+            color: var(--text-main);
+            width: 30px;
+            height: 30px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.8rem;
+        }
+
+        /* --- TABLAS --- */
+        .table-wrapper {
+            overflow-x: auto;
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            margin: 30px 0;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            background: rgba(0,0,0,0.2);
+        }
+
+        th {
+            background: rgba(0, 170, 255, 0.1);
+            color: var(--primary);
+            padding: 20px;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        td {
+            padding: 20px;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.95rem;
+        }
+
+        tr:last-child td { border-bottom: none; }
+
+        /* --- ALERTAS --- */
+        .note {
+            background: rgba(0, 170, 255, 0.05);
+            border-left: 4px solid var(--primary);
+            padding: 25px;
+            border-radius: 0 16px 16px 0;
+            margin: 30px 0;
+        }
+
+        .warning {
+            background: rgba(245, 158, 11, 0.05);
+            border-left: 4px solid var(--accent);
+            padding: 25px;
+            border-radius: 0 16px 16px 0;
+            margin: 30px 0;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin: 40px 0;
+        }
+
+        .feature-card {
+            background: linear-gradient(135deg, rgba(255,255,255,0.03) 0%, transparent 100%);
+            border: 1px solid var(--border);
+            padding: 30px;
+            border-radius: 20px;
+        }
+
+        .feature-card h4 {
+            color: var(--primary);
+            margin-top: 0;
+            font-size: 1.2rem;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .feature-card p {
+            margin: 0;
+            color: var(--text-dim);
+            font-size: 0.9rem;
+        }
+
+        .badge {
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-size: 0.7rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            display: inline-block;
+            margin-right: 5px;
+        }
+
+        .badge-primary { background: var(--primary); color: var(--dark-bg); }
+        .badge-secondary { background: var(--secondary); color: var(--dark-bg); }
+
+        footer {
+            text-align: center;
+            padding: 100px 20px;
+            border-top: 1px solid var(--border);
+            color: var(--text-dim);
+            font-size: 0.9rem;
+        }
+
+        @media (max-width: 768px) {
+            .cover h1 { font-size: 2.8rem; }
+            h2 { font-size: 2rem; }
+            .card { padding: 25px; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- PÁGINA 1: PORTADA -->
+    <section class="cover">
+        <div class="brand-badge">BYTE-ELECTRONICLAB DOCUMENTACIÓN OFICIAL</div>
+        <div class="logo-box">S</div>
+        <h1>SENTINEL PRO</h1>
+        <div class="version">v6.1.3 Edición Integrada</div>
+        <p>Monitor de Carga Inteligente con Protección de Grado Profesional para Motores y Compresores.</p>
         
-        // Check for active alerts in the thermostat to trigger shared buzzer
-        if (body.indexOf("\"alert_active\":true") > 0) {
-            triggerBuzzer(BUZ_THERMO_ALERT);
-        }
+        <div style="display: flex; gap: 10px; margin-top: 40px; flex-wrap: wrap; justify-content: center;">
+            <span class="badge badge-secondary">ACS712 + ESP32</span>
+            <span class="badge badge-secondary">WIFI + OTA</span>
+            <span class="badge badge-secondary">TERMOSTATO DUAL COMPATIBLE</span>
+            <span class="badge badge-secondary">GOOGLE SHEETS</span>
+            <span class="badge badge-secondary">SSR 25A</span>
+        </div>
+    </section>
+
+    <div class="content">
         
-        // addLog(("ThermoFetch OK [" + ip + "] " + (isStartEvent?"Start":"Cut")).c_str());
-        http.end();
-        break; // Tuvimos exito capturando datos del termostato, salir del bucle
-      }
-    }
-    http.end();
-    esp_task_wdt_reset();
-  }
-}
-
-void persistStartsIfNeeded() {
-  static unsigned long lastP = 0;
-  if (sys.pendingPersist && (millis() - lastP > PERSIST_INTERVAL)) {
-    prefs.begin("sp", false);
-    prefs.putULong("starts", sys.totalStarts);
-    prefs.end();
-    sys.pendingPersist = false;
-    lastP = millis();
-    fullDebug("FLASH", "Guardado");
-  }
-}
-
-void addLog(const char* msg) {
-  int ml = strlen(msg);
-  while (logLen + ml + 2 > LOG_SIZE - 10) {
-    char* nl = strrchr(logBuffer, '\n');
-    if (nl && nl > logBuffer) { *nl = 0; logLen = strlen(logBuffer); }
-    else { logBuffer[0] = 0; logLen = 0; break; }
-  }
-  char t[LOG_SIZE];
-  snprintf(t, LOG_SIZE, "%s\n%s", msg, logBuffer);
-  strncpy(logBuffer, t, LOG_SIZE - 1);
-  logBuffer[LOG_SIZE - 1] = 0;
-  logLen = strlen(logBuffer);
-}
-
-// Subida manual ligera sin HTTPClient para ahorrar RAM
-void cloudUpload(float maxA, unsigned long dur, const char* evt, String br = "") {
-  if (sys.wifiModeAP || cfg.gasId.length() < 10) return;
-
-  const char* host = "script.google.com";
-  // IMPORTANTE: Puerto 443 es SSL
-  WiFiClientSecure client;
-  client.setInsecure(); // No validar certs
-  client.setTimeout(10000);
-
-  addLog(("RAM: " + String(ESP.getFreeHeap())).c_str());
-  addLog("Conectando (Raw SSL)...");
-
-  if (!client.connect(host, 443)) {
-    addLog("Fallo Conexión Raw SSL");
-    return;
-  }
-
-  addLog("SSL OK! Enviando GET...");
-
-  // Construir peticion HTTP 1.1 manualmente
-  String url = "/macros/s/" + cfg.gasId + "/exec";
-  url += "?amp=" + String(maxA, 2) + "&dur=" + String(dur) + "&evento=" + String(evt);
-  url += "&st1=" + String(sys.startTemp1, 1) + "&st2=" + String(sys.startTemp2, 1);
-  url += "&t1=" + String(sys.lastCutTemp1, 1) + "&t2=" + String(sys.lastCutTemp2, 1);
-  if (br.length() > 0) url += "&br=" + br;
-  
-  String req = String("GET ") + url + " HTTP/1.1\r\n" +
-               "Host: " + host + "\r\n" +
-               "User-Agent: SentinelPro/6.1.3\r\n" +
-               "Connection: close\r\n\r\n";
-               
-  client.print(req);
-
-  // Leer respuesta (buscando el 302 Found)
-  unsigned long timeout = millis();
-  while (client.connected()) {
-    esp_task_wdt_reset();
-    if (client.available()) {
-      String line = client.readStringUntil('\n');
-      if (line == "\r") {
-        addLog("Headers recibidos OK");
-        break; 
-      }
-      if (line.startsWith("HTTP/1.1 302") || line.startsWith("HTTP/1.1 200")) {
-        addLog("Cloud: EXITO (Cod 302/200)");
-        client.stop();
-        return;
-      }
-    }
-    if (millis() - timeout > 10000) {
-      addLog("Timeout esperando respuesta");
-      client.stop();
-      return;
-    }
-  }
-  
-  addLog("Fin conexion sin confirmacion");
-  client.stop();
-}
-
-float applyFilter(float v) {
-  ampBuf[ampIdx] = v;
-  ampIdx = (ampIdx + 1) % WIN;
-  float s = 0;
-  for (int i = 0; i < WIN; i++) s += ampBuf[i];
-  return s / WIN;
-}
-
-// Lectura RMS optimizada para filtro RC hardware (1k + 100nF)
-// Ventana 100ms = 5 ciclos completos de 50Hz = maxima precision
-// Puerta de ruido baja (8.0) porque el cap 104 ya filtra HF
-float readRMS() {
-  uint64_t sumSq = 0;
-  uint32_t sumRaw = 0;
-  int n = 0;
-  unsigned long t0 = millis();
-  
-  while (n < 2000 && millis() - t0 < 150) {
-    int raw = analogRead(PIN_SENSOR);
-    sumRaw += raw;
-    int32_t d = raw - cfg.zero;
-    sumSq += (int64_t)d * d;
-    n++;
-  }
-  
-  if (n > 0) sys.lastRawAvg = sumRaw / n;
-  float rms = sqrt((double)sumSq / (n > 0 ? n : 1));
-  sys.lastRMS = rms;
-
-  // BAJAMOS LA PUERTA: La ponemos en 25.0
-  // Con 1 Amper de heladera y sensor de 30A, el RMS debería rondar los 35-40.
-  // Si lo dejamos en 25, la heladera PASA, pero el ruido debería quedar ABAJO.
-  if (rms < 25.0) return 0.0; 
-  
-  return rms * cfg.sens; 
-}
-
-void runDiagnostics() {
-  if (cycleCount < 2) { diagMsg = "Recopilando (" + String(cycleCount) + "/" + String(MAX_HISTORY) + ")..."; return; }
-  int sc = 0, stalls = 0; unsigned long td = 0; float aa = 0, peakMax = 0;
-  int vc = min(cycleCount, MAX_HISTORY);
-  for (int i = 0; i < vc; i++) {
-    if (cycleHistory[i].wasShort) sc++;
-    if (cycleHistory[i].wasStall) stalls++;
-    td += cycleHistory[i].duration;
-    aa += cycleHistory[i].maxAmp;
-    if (cycleHistory[i].peakAmp > peakMax) peakMax = cycleHistory[i].peakAmp;
-  }
-  aa /= vc; float ad = (float)td / vc;
-  // Prioridad de alertas: stall > cortos > consumo alto > ciclos largos
-  if (sys.isStalled) diagMsg = "ALERTA: MOTOR CLAVADO! Desconectar YA! " + String(sys.currentAmp, 1) + "A";
-  else if (stalls > 0) diagMsg = "ALERTA: " + String(stalls) + " stalls detectados. Revisar compresor.";
-  else if (sc >= 3) diagMsg = "ALERTA: " + String(sc) + " cortos. Capacitor o protector termico.";
-  else if (peakMax > cfg.overCurrentAmp) diagMsg = "ADVERTENCIA: Pico de " + String(peakMax, 1) + "A detectado.";
-  else if (ad > 1800) diagMsg = "ADVERTENCIA: Ciclos largos (" + String((int)ad) + "s). Gas o filtro.";
-  else if (aa > 5.0) diagMsg = "ADVERTENCIA: Consumo alto (" + String(aa, 1) + "A). Bobinado.";
-  else diagMsg = "OK: Normal. " + String((int)ad) + "s/ciclo, " + String(aa, 1) + "A pico, max:" + String(peakMax, 1) + "A";
-}
-
-String getUptime() {
-  unsigned long s = (millis() - sys.bootTime) / 1000;
-  return String(s / 3600) + "h" + String((s % 3600) / 60) + "m";
-}
-
-String escJSON(const char* src) {
-  String o; o.reserve(strlen(src) + 20);
-  while (*src) {
-    if (*src == '"') o += "\\\"";
-    else if (*src == '\\') o += "\\\\";
-    else if (*src == '\n') o += "\\n";
-    else if (*src != '\r') o += *src;
-    src++;
-  }
-  return o;
-}
-
-String getBootReason() {
-  esp_reset_reason_t reason = esp_reset_reason();
-  switch (reason) {
-    case ESP_RST_POWERON: return "Encendido (Power-On)";
-    case ESP_RST_EXT:     return "Botón Físico (Reset Pin)";
-    case ESP_RST_SW:      return "Software (Dashboard/OTA)";
-    case ESP_RST_PANIC:   // Fallo de software grave
-    case ESP_RST_INT_WDT: // Watchdog interno
-    case ESP_RST_TASK_WDT: return "Watchdog (Protección Cuelgue)";
-    case ESP_RST_WDT:     return "Watchdog (Genérico)";
-    case ESP_RST_DEEPSLEEP: return "Deep Sleep";
-    case ESP_RST_BROWNOUT: return "Brownout (Baja Tensión)";
-    default: return "Desconocido (" + String(reason) + ")";
-  }
-}
-
-// === WEB HANDLERS ===
-void handleRoot() { server.sendHeader("Cache-Control", "no-cache"); server.send_P(200, "text/html", HTML_PAGE); }
-void handleManual() { server.sendHeader("Cache-Control", "no-cache"); server.send_P(200, "text/html", HTML_MANUAL); }
-
-// Handler de /config: sirve la pagina de configuracion en porciones para no bloquear el WDT
-void handleConfig() {
-  esp_task_wdt_reset();
-  String h = "<!DOCTYPE html><html lang='es'><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1'>";
-  h += "<title>Config - Sentinel Pro v6.1.3</title>";
-  h += "<style>:root{--p:#0d6efd;--r:#dc3545;--bg:#f0f2f5;--c:#fff;--t:#212529;--m:#6c757d}";
-  h += "*{box-sizing:border-box;margin:0}body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--t);padding:12px}";
-  h += ".cd{background:var(--c);padding:16px;border-radius:12px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,.05);border:1px solid #e9ecef}";
-  h += ".lb{font-size:.7em;color:var(--m);text-transform:uppercase;letter-spacing:1px;font-weight:700;margin-bottom:8px}";
-  h += ".sec-title{font-size:.8em;font-weight:700;color:var(--p);text-transform:uppercase;letter-spacing:1px;margin:14px 0 6px}";
-  h += ".sec-title.r{color:var(--r)}.g2{display:grid;grid-template-columns:1fr 1fr;gap:12px}";
-  h += "input[type=text],input[type=number],input[type=password]{width:100%;padding:10px;border:1px solid #ced4da;border-radius:6px;font-size:.9em;margin-top:2px}";
-  h += "input:focus{border-color:var(--p);outline:0;box-shadow:0 0 0 3px rgba(13,110,253,.15)}";
-  h += "label{display:block;font-size:.78em;font-weight:600;color:#495057;margin-bottom:2px;margin-top:10px}";
-  h += ".ht{font-size:.65em;color:#999;margin-top:1px;font-style:italic}.sep{border:0;border-top:1px solid #eee;margin:18px 0}";
-  h += ".btn{width:100%;padding:12px;border:none;border-radius:8px;font-weight:700;cursor:pointer;margin-top:10px;transition:.15s}";
-  h += ".bp{background:var(--p);color:#fff}.bs{background:var(--m);color:#fff;font-size:.82em}.br{background:var(--r);color:#fff;font-size:.82em}.bo{background:#e67e22;color:#fff;font-size:.82em}";
-  h += "details summary{cursor:pointer;padding:10px;background:#f0f2f5;border-radius:8px;font-weight:700;font-size:.85em;color:var(--p);user-select:none;margin-bottom:8px}";
-  h += "@media(max-width:500px){.g2{grid-template-columns:1fr}}</style></head><body>";
-  h += "<div style='display:flex;align-items:center;gap:10px;margin-bottom:12px'>";
-  h += "<a href='/' style='padding:8px 14px;background:var(--m);color:#fff;text-decoration:none;border-radius:8px;font-size:.82em;font-weight:700'>&larr; Dashboard</a>";
-  h += "<span style='font-size:.85em;font-weight:700;color:var(--p)'>&#9881; Configuracion - Sentinel Pro v6.1.3</span></div>";
-  server.setContentLength(CONTENT_LENGTH_UNKNOWN);
-  server.sendHeader("Cache-Control","no-cache");
-  server.send(200, "text/html", h);
-  esp_task_wdt_reset();
-
-  // -- Parte 2: Form WiFi + Termostato --
-  String h2 = "<div class='cd'><div class='lb'>Configuracion General</div>";
-  h2 += "<form action='/save' method='POST'>";
-  h2 += "<div class='sec-title'>Conexion WiFi</div>";
-  h2 += "<div class='g2'><div><label>WiFi SSID</label><input type='text' name='ssid' value='" + cfg.ssid + "'><div class='ht'>Nombre de tu red 2.4GHz</div></div>";
-  h2 += "<div><label>WiFi Password</label><input type='password' name='pass' placeholder='(sin cambios)'><div class='ht'>Dejar vacio para no cambiar</div></div></div>";
-  h2 += "<label>Google Script ID (para grabación)</label><input type='text' name='gas' value='" + cfg.gasId + "'><div class='ht'>ID largo del Apps Script (AKfycb...). Se usa para guardar datos.</div>";
-  h2 += "<hr class='sep'><div class='sec-title'>&#127777; Termostato DS18B20 v5.2</div>";
-  h2 += "<label>IP del Termostato (cambiar si la IP cambia)</label><input type='text' name='nodeIPs' value='" + cfg.nodeIPs + "' placeholder='192.168.1.80'><div class='ht'>El Sentinel la usa para leer temperatura en cada ciclo.</div>";
-  h2 += "<label>Corte Seguridad Temp Nodo (&deg;C)</label><input type='number' step='0.1' name='mts' value='" + String(cfg.maxTempSafety, 1) + "'><div class='ht'>Si el nodo reporta mas de esto, Sentinel corta el motor.</div>";
-  h2 += "<label>Google Sheet ID (ID para el botón VER)</label><input type='text' name='sid' value='" + cfg.sheetId + "'><div class='ht'>ID de la hoja (lo que va entre /d/ y /edit). Úsalo solo para el botón del dashboard.</div>";
-  h2 += "<hr class='sep'><div class='sec-title'>Modos de Operacion</div>";
-  h2 += "<div class='g2'><div><label><input type='checkbox' name='prot' value='1'" + String(cfg.protectMode ? " checked" : "") + "> Proteccion Ciclos Cortos</label><div class='ht'>Al 3er ciclo corto seguido corta el SSR automaticamente</div></div>";
-  h2 += "<div><label style='color:#b08d00'><input type='checkbox' name='test' value='1'" + String(cfg.test24h ? " checked" : "") + "> Test 24 Horas</label><div class='ht'>Muestra progreso % en LCD</div></div></div>";
-  server.sendContent(h2);
-  esp_task_wdt_reset();
-
-  // -- Parte 3: Ajuste Avanzado --
-  String h3 = "<hr class='sep'><details><summary>&#9881; AJUSTE AVANZADO &mdash; Sensor &amp; Motor (expandir)</summary><div style='padding:8px 0'>";
-  h3 += "<div class='sec-title'>Sensor ACS712</div>";
-  h3 += "<div class='g2'><div><label>Zero ADC</label><input type='number' name='zero' value='" + String(cfg.zero) + "'><div class='ht'>Sin carga (~1862). Usa Recalibrar Zero para auto-ajustar.</div></div>";
-  h3 += "<div><label>Sensibilidad (V/A)</label><input type='text' name='sens' value='" + String(cfg.sens, 4) + "'><div class='ht'>5A=0.0264 | 20A=0.066 | 30A=0.044</div></div></div>";
-  h3 += "<hr class='sep'><div class='sec-title'>Deteccion del Motor</div>";
-  h3 += "<div class='g2'><div><label>Umbral Arranque (A)</label><input type='number' step='0.1' name='trig' value='" + String(cfg.trigAmp, 1) + "'><div class='ht'>Corriente minima para detectar motor ON</div></div>";
-  h3 += "<div><label>Duracion Minima Ciclo (seg)</label><input type='number' name='short' value='" + String(cfg.shortCycleSec) + "'><div class='ht'>Ciclo mas corto = rateada</div></div></div>";
-  h3 += "<hr class='sep'><div class='sec-title r'>Proteccion del Motor</div>";
-  h3 += "<div class='g2'><div><label>Stall: Umbral Corriente (A)</label><input type='number' step='0.1' name='stall' value='" + String(cfg.stallAmp, 1) + "'><div class='ht'>Si supera esto x segundos = motor clavado</div></div>";
-  h3 += "<div><label>Stall: Tiempo Tolerancia (seg)</label><input type='number' name='stallt' value='" + String(cfg.stallTimeSec) + "'><div class='ht'>Segundos max con alta corriente antes de cortar</div></div></div>";
-  h3 += "<div class='g2'><div><label>Falta de Gas: Consumo Minimo (A)</label><input type='number' step='0.1' name='minwa' value='" + String(cfg.minWorkAmp, 1) + "'><div class='ht'>Si baja de esto estando ON, corta (fuga/vacio)</div></div>";
-  h3 += "<div><label>Sobrecorriente: Limite Peligro (A)</label><input type='number' step='0.1' name='overcur' value='" + String(cfg.overCurrentAmp, 1) + "'><div class='ht'>Alerta critica si supera este valor</div></div></div>";
-  h3 += "</div></details>";
-  server.sendContent(h3);
-  esp_task_wdt_reset();
-
-  // -- Parte 4: Botones --
-  String h4 = "<button class='btn bp' style='margin-top:14px'>GUARDAR Y REINICIAR</button></form>";
-  h4 += "<div class='g2' style='margin-top:10px'>";
-  h4 += "<button type='button' class='btn bs' onclick=\"fetch('/reset').then(function(){alert('Contador reseteado');location.reload();})\">Reset Contador</button>";
-  h4 += "<button type='button' class='btn bs' onclick=\"fetch('/recal').then(function(){alert('Zero recalibrado');location.reload();})\">Recalibrar Zero</button>";
-  h4 += "<button type='button' class='btn bo' onclick=\"fetch('/test').then(function(){alert('Test enviado. Revisa el Log.')})\">PROBAR NUBE</button>";
-  h4 += "</div></div></body></html>";
-  server.sendContent(h4);
-  server.sendContent(""); // Finaliza chunked
-}
-
-
-
-void handleApi() {
-  char tb[9] = "--:--:--"; struct tm ti;
-  if (!sys.wifiModeAP && getLocalTime(&ti)) strftime(tb, 9, "%H:%M:%S", &ti);
-  else { unsigned long s = millis() / 1000; snprintf(tb, 9, "%02lu:%02lu:%02lu", (s / 3600) % 24, (s / 60) % 60, s % 60); }
-  // Calcular duty cycle
-  unsigned long upSec = (millis() - sys.bootTime) / 1000;
-  int duty = (upSec > 0) ? (int)((totalOnTime * 100) / upSec) : 0;
-  String j;
-  j.reserve(1500);
-  j = "{\"a\":" + String(sys.currentAmp, 2) + ",\"t\":" + String(sys.totalStarts);
-  j += ",\"on\":" + String(sys.isMotorOn ? "true" : "false") + ",\"rt\":" + String(sys.currentRunTime);
-  j += ",\"stalled\":" + String(sys.isStalled ? "true" : "false");
-  j += ",\"peak\":" + String(sys.peakAmp, 1) + ",\"duty\":" + String(duty) + ",\"stalls\":" + String(sys.stallCount);
-  j += ",\"ld\":" + String(sys.lastRunDuration) + ",\"up\":\"" + getUptime() + "\"";
-  j += ",\"cutTemp1\":" + String(sys.lastCutTemp1, 1) + ",\"cutTemp2\":" + String(sys.lastCutTemp2, 1);
-  j += ",\"stTemp1\":" + String(sys.startTemp1, 1) + ",\"stTemp2\":" + String(sys.startTemp2, 1);
-  j += ",\"time\":\"" + String(tb) + "\",\"log\":\"" + escJSON(logBuffer) + "\",\"br\":\"" + sys.bootReason + "\"";
-  j += ",\"diag\":\"" + escJSON(diagMsg.c_str()) + "\"";
-  j += ",\"dbg\":{\"raw\":" + String(sys.lastRawAvg) + ",\"rms\":" + String(sys.lastRMS, 1) + ",\"ram\":" + String(ESP.getFreeHeap()) + "}";
-  j += ",\"hist\":[";
-  int vc = min(cycleCount, MAX_HISTORY);
-  for (int i = 0; i < vc; i++) { if (i) j += ","; j += "{\"d\":" + String(cycleHistory[i].duration) + ",\"a\":" + String(cycleHistory[i].maxAmp, 1) + ",\"s\":" + String(cycleHistory[i].wasShort ? "true" : "false") + "}"; }
-  j += "],\"cf\":{\"ssid\":\"" + escJSON(cfg.ssid.c_str()) + "\",\"gas\":\"" + escJSON(cfg.gasId.c_str()) + "\",\"sid\":\"" + escJSON(cfg.sheetId.c_str()) + "\"";
-  j += ",\"zero\":" + String(cfg.zero) + ",\"sens\":" + String(cfg.sens, 4) + ",\"trig\":" + String(cfg.trigAmp, 1);
-  j += ",\"sh\":" + String(cfg.shortCycleSec) + ",\"sa\":" + String(cfg.stallAmp, 1) + ",\"st\":" + String(cfg.stallTimeSec);
-  j += ",\"minwa\":" + String(cfg.minWorkAmp, 1) + ",\"oc\":" + String(cfg.overCurrentAmp, 1);
-  j += ",\"tripped\":" + String(sys.protectionTripped ? "true" : "false");
-  j += ",\"prot\":" + String(cfg.protectMode ? "true" : "false");
-  j += ",\"test\":" + String(cfg.test24h ? "true" : "false");
-  j += ",\"mts\":" + String(cfg.maxTempSafety, 1);
-  j += ",\"nodeIPs\":\"" + escJSON(cfg.nodeIPs.c_str()) + "\"}}";
-  server.send(200, "application/json", j);
-}
-
-void handleSave() {
-  String s = server.arg("ssid"); s.trim(); if (s.length() > 0) cfg.ssid = s;
-  String p = server.arg("pass"); p.trim(); if (p.length() > 0) cfg.pass = p;
-  cfg.gasId = server.arg("gas"); cfg.gasId.trim();
-  cfg.sheetId = server.arg("sid"); cfg.sheetId.trim();
-  String z = server.arg("zero"); z.trim(); if (z.length() > 0) cfg.zero = z.toInt();
-  String se = server.arg("sens"); se.trim(); if (se.length() > 0) cfg.sens = se.toFloat();
-  String tr = server.arg("trig"); tr.trim(); if (tr.length() > 0) cfg.trigAmp = tr.toFloat();
-  String sh = server.arg("short"); sh.trim(); if (sh.length() > 0) cfg.shortCycleSec = sh.toInt();
-  String sa = server.arg("stall"); sa.trim(); if (sa.length() > 0) cfg.stallAmp = sa.toFloat();
-  String st2 = server.arg("stallt"); st2.trim(); if (st2.length() > 0) cfg.stallTimeSec = st2.toInt();
-  String mw = server.arg("minwa"); mw.trim(); if (mw.length() > 0) cfg.minWorkAmp = mw.toFloat();
-  String oc = server.arg("overcur"); oc.trim(); if (oc.length() > 0) cfg.overCurrentAmp = oc.toFloat();
-  String mtsString = server.arg("mts"); mtsString.trim(); if (mtsString.length() > 0) cfg.maxTempSafety = mtsString.toFloat();
-  String tip = server.arg("nodeIPs"); tip.trim(); if (tip.length() >= 7) cfg.nodeIPs = tip;
-  cfg.protectMode = server.hasArg("prot");
-  cfg.test24h = server.hasArg("test");
-  cfg.cutoffAmp = cfg.trigAmp * 0.3;
-  saveAllConfig();
-  prefs.begin("sp", false); prefs.putULong("starts", sys.totalStarts); prefs.end();
-  server.send(200, "text/html", "<h2 style='text-align:center;margin-top:40vh'>Guardado. Reiniciando...</h2><script>setTimeout(function(){location='/'},3000)</script>");
-  delay(800); ESP.restart();
-}
-
-void handleReset() {
-  sys.totalStarts = 0;
-  prefs.begin("sp", false); prefs.putULong("starts", 0); prefs.end();
-  addLog("Reset contador"); fullDebug("RESET", "Contador a 0");
-  server.send(200, "text/plain", "OK");
-}
-
-void handleRecalibrate() {
-  long s = 0;
-  for (int i = 0; i < 2000; i++) { s += analogRead(PIN_SENSOR); delayMicroseconds(100); }
-  cfg.zero = s / 2000;
-  prefs.begin("sp", false); prefs.putInt("zero", cfg.zero); prefs.end();
-  char m[40]; snprintf(m, 40, "Recal: %d", cfg.zero);
-  addLog(m); fullDebug("CAL", m);
-  server.send(200, "text/plain", "OK");
-}
-
-void handleTestCloud() {
-  cloudUpload(0.0, 0, "TEST_USER_BTN");
-  server.send(200, "text/plain", "OK");
-}
-
-void handleRearm() {
-  if (sys.protectionTripped) {
-    sys.protectionTripped = false;
-    prefs.begin("sp", false); prefs.putBool("tripped", false); prefs.end();
-    digitalWrite(PIN_RELAY, HIGH); // Rehabilitar SSR
-    addLog("RELE: Rearmado Manual por OK");
-    fullDebug("RELE", "Rearme Manual OK");
-    triggerBuzzer(BUZ_OK);
-  }
-  server.send(200, "text/plain", "OK");
-}
-
-void handleOTAUpload() {
-  HTTPUpload& up = server.upload();
-  if (up.status == UPLOAD_FILE_START) { if (!Update.begin(UPDATE_SIZE_UNKNOWN)) addLog("OTA:NoSpace"); }
-  else if (up.status == UPLOAD_FILE_WRITE) { Update.write(up.buf, up.currentSize); esp_task_wdt_reset(); }
-  else if (up.status == UPLOAD_FILE_END) { if (Update.end(true)) addLog("OTA OK"); else addLog("OTA FAIL"); }
-}
-
-// === SETUP ===
-void setup() {
-  Serial.begin(115200);
-  #ifdef ENABLE_BT
-  SerialBT.begin("SentinelBT");
-  #endif
-  sys.bootTime = millis();
-  sys.bootReason = getBootReason();
-  memset(ampBuf, 0, sizeof(ampBuf));
-  memset(cycleHistory, 0, sizeof(cycleHistory));
-  memset(logBuffer, 0, sizeof(logBuffer));
-
-  esp_task_wdt_init(&wdt_cfg);
-  esp_task_wdt_add(NULL);
-
-  // Inicializar SSR RELAY y BUZZER
-  pinMode(PIN_RELAY, OUTPUT);
-  // Leemos si el equipo se apago estando bloqueado por una emergencia
-  prefs.begin("sp", false);
-  sys.protectionTripped = prefs.getBool("tripped", false);
-  prefs.end();
-
-  if (sys.protectionTripped) {
-    digitalWrite(PIN_RELAY, LOW); // Mantiene el corte por memoria
-  } else {
-    digitalWrite(PIN_RELAY, HIGH); // SSR Conduciendo por defecto
-  }
-
-  pinMode(PIN_BUZZER, OUTPUT);
-  digitalWrite(PIN_BUZZER, LOW); // Buzzer apagado
-  pinMode(PIN_BUTTON, INPUT_PULLUP);
-
-  // Configuración de I2C robusta
-  Wire.begin(); 
-  Wire.setClock(50000); // 50kHz: Muy lento pero extremadamente estable contra ruido
-  lcd.init(); lcd.backlight(); lcd.clear();
-  lcd.setCursor(0, 0); lcd.print("SENTINEL PRO 6.1.3");
-
-  // AUTO-ZERO: calibrar antes de cargar config
-  lcd.setCursor(0, 1); lcd.print("Calibrando...");
-  long acc = 0;
-  for (int i = 0; i < 2000; i++) { acc += analogRead(PIN_SENSOR); delayMicroseconds(100); esp_task_wdt_reset(); }
-  int autoZero = acc / 2000;
-
-  loadConfig();
-  // Usar auto-zero si es la primera vez o si difiere mucho
-  if (abs(autoZero - cfg.zero) > 100) {
-    cfg.zero = autoZero;
-    prefs.begin("sp", false); prefs.putInt("zero", cfg.zero); prefs.end();
-  }
-
-  if (cfg.test24h) sys.bootTime = millis();
-
-  fullDebug("BOOT", "Iniciando v6.1.3");
-  fullDebug("CFG", ("Z:" + String(cfg.zero) + " S:" + String(cfg.sens, 4) + " T:" + String(cfg.trigAmp, 1)).c_str());
-
-  // WiFi
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(cfg.ssid.c_str(), cfg.pass.c_str());
-  lcd.setCursor(0, 1); lcd.print("WiFi...");
-  int r = 0;
-  while (WiFi.status() != WL_CONNECTED && r < 20) { delay(500); r++; esp_task_wdt_reset(); }
-
-  if (WiFi.status() == WL_CONNECTED) {
-    WiFi.softAPdisconnect(true);
-    configTime(gmtOffset, 0, ntpServer);
-    
-    // Sincronizacion silenciosa (no bloqueante)
-    // La hora se actualizara sola en segundo plano.
-    // El dashboard mostrara la hora cuando este lista.
-
-    sys.ipAddr = WiFi.localIP().toString();
-    sys.wifiModeAP = false;
-    addLog(("WiFi:" + sys.ipAddr).c_str());
-    fullDebug("NET", ("OK:" + sys.ipAddr).c_str());
-  } else {
-    sys.wifiModeAP = true;
-    WiFi.mode(WIFI_AP);
-    WiFi.softAP("Sentinel_Pro", "12345678");
-    sys.ipAddr = "192.168.4.1";
-    addLog("AP:192.168.4.1");
-    fullDebug("NET", "Modo AP");
-  }
-
-  server.on("/", handleRoot);
-  server.on("/manual", handleManual);
-  server.on("/config", handleConfig);
-  server.on("/api", handleApi);
-  server.on("/save", HTTP_POST, handleSave);
-  server.on("/reset", handleReset);
-  server.on("/recal", handleRecalibrate);
-  server.on("/test", handleTestCloud);
-  server.on("/rearm", handleRearm);
-  server.on("/update", HTTP_POST, []() {
-    if (Update.hasError()) {
-      server.send(200, "text/html", "FALLO EN ACTUALIZACION");
-    } else {
-      server.sendHeader("Content-Type", "text/html; charset=utf-8");
-      server.send(200, "text/html", "<h2>&iexcl;ACTUALIZACI&Oacute;N OK!</h2><p>Reiniciando equipo...</p><script>setTimeout(function(){location='/'},8000)</script>");
-      delay(800);
-      ESP.restart();
-    }
-  }, handleOTAUpload);
-
-  // API estandarizada de red de nodos
-  server.on("/node-info", HTTP_GET, []() {
-    unsigned long upSec = (millis() - sys.bootTime) / 1000;
-    unsigned long upSecTotal = upSec > 0 ? upSec : 1;
-    int duty = (int)((totalOnTime * 100) / upSecTotal);
-    String j = "{\"node_id\":\"sentinel\",\"node_type\":\"motor_monitor\",\"fw_version\":\"6.1.3\"" + String("");
-    j += ",\"uptime_sec\":" + String(upSec);
-    j += ",\"ip\":\"" + sys.ipAddr + "\"";
-    j += ",\"data\":{";
-    j += "\"current_amp\":" + String(sys.currentAmp, 2);
-    j += ",\"motor_on\":" + String(sys.isMotorOn ? "true" : "false");
-    j += ",\"total_cycles\":" + String(sys.totalStarts);
-    j += ",\"last_duration_sec\":" + String(sys.lastRunDuration);
-    j += ",\"duty_cycle_pct\":" + String(duty);
-    j += ",\"stall_count\":" + String(sys.stallCount);
-    j += ",\"is_stalled\":" + String(sys.isStalled ? "true" : "false");
-    j += ",\"protection_tripped\":" + String(sys.protectionTripped ? "true" : "false");
-    j += ",\"last_cut_temp1_c\":" + String(sys.lastCutTemp1, 1);
-    j += ",\"last_cut_temp2_c\":" + String(sys.lastCutTemp2, 1);
-    j += ",\"diagnostics\":\"" + escJSON(diagMsg.c_str()) + "\"";
-    j += "}}";
-    server.sendHeader("Access-Control-Allow-Origin", "*");
-    server.send(200, "application/json", j);
-  });
-
-  // Endpoint de configuracion de red (para que el dashboard sepa la IP del par)
-  server.on("/net-cfg", HTTP_GET, []() {
-    String j = "{\"nodeIPs\":\"" + cfg.nodeIPs + "\",\"myIP\":\"" + sys.ipAddr + "\"}";
-    server.sendHeader("Access-Control-Allow-Origin", "*");
-    server.send(200, "application/json", j);
-  });
-
-  server.begin();
-  addLog(("Inicio: " + sys.bootReason).c_str());
-  cloudUpload(0, 0, "BOOT_DEVICE", sys.bootReason); // Registrar inicio en la nube
-  fullDebug("BOOT", ("RAM:" + String(ESP.getFreeHeap())).c_str());
-  lcd.clear();
-  triggerBuzzer(BUZ_BOOT);
-}
-
-// === LOOP ===
-void loop() {
-  esp_task_wdt_reset();
-  server.handleClient();
-  updateBuzzer();
-
-  // === BOTON FISICO DE RESETEO (3 PRENSES + 3S TIMEOUT) ===
-  static bool lastBtn = HIGH;
-  bool btn = digitalRead(PIN_BUTTON);
-  if (btn == LOW && lastBtn == HIGH) { // Flanco de bajada
-    unsigned long nowBtn = millis();
-    if (sys.resetConfirmState == 0) {
-      sys.resetConfirmState = 1;
-      sys.lastResetPress = nowBtn;
-      triggerBuzzer(BUZ_OK);
-      lcd.clear();
-    } else if (sys.resetConfirmState == 1) {
-      sys.resetConfirmState = 2;
-      sys.lastResetPress = nowBtn;
-      triggerBuzzer(BUZ_OK);
-      lcd.clear();
-    } else if (sys.resetConfirmState == 2) {
-      handleReset(); // Ejecuta el reseteo
-      sys.resetConfirmState = 0;
-      lcd.clear();
-      triggerBuzzer(BUZ_OK);
-      delay(200);
-      triggerBuzzer(BUZ_OK);
-    }
-    delay(50); // Debounce simple
-  }
-  lastBtn = btn;
-
-  // Timeout de confirmacion (3 segundos)
-  if (sys.resetConfirmState > 0 && millis() - sys.lastResetPress > 3000) {
-    sys.resetConfirmState = 0;
-    lcd.clear();
-    addLog("Reset timeout");
-  }
-
-  static unsigned long lastSample = 0, lastLCD = 0, lastWiFi = 0, lastBT = 0, motorStart = 0;
-  static float maxAmp = 0;
-  static int confirm = 0;
-  unsigned long now = millis();
-
-  // Muestreo 150ms
-  if (now - lastSample > 150) {
-    // === REARME AUTOMATICO DE PROTECCION (5 MIN) ===
-    if (sys.protectionTripped) {
-      if (now - sys.protectionTime > 300000) { // 300000ms = 5 minutos
-        sys.protectionTripped = false;
-        prefs.begin("sp", false); prefs.putBool("tripped", false); prefs.end();
-        digitalWrite(PIN_RELAY, HIGH); // Rehabilitar SSR
-        addLog("RELE: Reactivado (Fin bloqueo)");
-        fullDebug("RELE", "Fin bloqueo 5m");
-        triggerBuzzer(BUZ_OK);
-      }
-    }
-
-    float raw = readRMS();
-    sys.currentAmp = applyFilter(raw);
-    if (sys.isMotorOn && sys.currentAmp > maxAmp) maxAmp = sys.currentAmp;
-    // Trackear pico maximo del ciclo
-    if (sys.isMotorOn && sys.currentAmp > sys.peakAmp) sys.peakAmp = sys.currentAmp;
-
-    // === DETECCION DE SOBRECORRIENTE ===
-    if (sys.currentAmp > cfg.overCurrentAmp && !sys.overCurrentAlert) {
-      sys.overCurrentAlert = true;
-      char m[60]; snprintf(m, 60, "!! SOBRECORRIENTE %.1fA (lim:%.1fA)", sys.currentAmp, cfg.overCurrentAmp);
-      addLog(m); fullDebug("PELIGRO", m);
-      cloudUpload(sys.currentAmp, 0, "SOBRECORRIENTE", "");
-    }
-    if (sys.currentAmp < cfg.overCurrentAmp * 0.7) sys.overCurrentAlert = false;
-
-    // === DETECCION DE MOTOR CLAVADO (STALL) ===
-    // Si el motor lleva mas de stallTimeSec con corriente > stallAmp = CLAVADO
-    if (sys.isMotorOn) {
-      unsigned long runSec = (now - motorStart) / 1000;
-      if (runSec > (unsigned long)cfg.stallTimeSec && sys.currentAmp > cfg.stallAmp) {
-        if (!sys.isStalled) {
-          sys.isStalled = true;
-          sys.stallCount++;
-          char m[70]; snprintf(m, 70, "!! MOTOR CLAVADO! %.1fA x %lus", sys.currentAmp, runSec);
-          addLog(m); fullDebug("STALL", m);
-          cloudUpload(sys.currentAmp, runSec, "MOTOR_CLAVADO", "");
-
-          // DISPARADOR DE CORTE PROTECCION SSR
-          if (cfg.protectMode) {
-            sys.protectionTripped = true;
-            sys.protectionTime = now;
-            prefs.begin("sp", false); prefs.putBool("tripped", true); prefs.end();
-            digitalWrite(PIN_RELAY, LOW); // Apaga SSR
-            addLog("RELE: MOTOR CORTADO POR STALL");
-            triggerBuzzer(BUZ_STALL);
-          }
-        }
-        // Repetir alerta cada 30 seg si sigue clavado
-        if (!sys.stallAlertSent || (runSec % 30 == 0)) {
-          fullDebug("STALL", "SIGUE CLAVADO - DESCONECTAR!");
-          sys.stallAlertSent = true;
-        }
-      }
-      
-      // FALLA DE GAS O COMPRESOR TRABAJANDO VACIO (BAJO CONSUMO)
-      // Chequear solo si pasaron mas de 15 segundos para obviar inestabilidades del arranque
-      if (runSec > 15 && sys.currentAmp < cfg.minWorkAmp && sys.currentAmp > cfg.trigAmp) {
-         if (!sys.isStalled) { // Usamos 'isStalled' de forma gemela para fallas críticas en gral
-            sys.isStalled = true;
-            sys.stallCount++;
-            char m[70]; snprintf(m, 70, "!! FALLA GAS (%.1fA < %.1fA)", sys.currentAmp, cfg.minWorkAmp);
-            addLog(m); fullDebug("FALLAGAS", m);
-            cloudUpload(sys.currentAmp, runSec, "FALLA_GAS_COMP", "");
-
-            // DISPARADOR DE CORTE PROTECCION SSR
-            if (cfg.protectMode) {
-              sys.protectionTripped = true;
-              sys.protectionTime = now;
-              prefs.begin("sp", false); prefs.putBool("tripped", true); prefs.end();
-              digitalWrite(PIN_RELAY, LOW); // Apaga SSR
-              addLog("RELE: MOTOR CORTADO POR FALLA GAS");
-              triggerBuzzer(BUZ_STALL);
-            }
-         }
-      }
-    }
-
-    // Arranque con 3 confirmaciones (anti-flicker)
-    if (!sys.isMotorOn && sys.currentAmp > cfg.trigAmp) {
-      confirm++;
-      if (confirm >= 3) {
-        sys.isMotorOn = true; motorStart = now;
-        maxAmp = sys.currentAmp; sys.peakAmp = sys.currentAmp;
-        sys.isStalled = false; sys.stallAlertSent = false;
-        confirm = 0;
-        fetchThermoTemp(true); // Captura temp arranque
-        fullDebug("EVENT", "MOTOR ON"); addLog("ARRANQUE");
-      }
-    } else if (!sys.isMotorOn) confirm = 0;
-
-    // Parada con histeresis
-    if (sys.isMotorOn && sys.currentAmp < cfg.cutoffAmp) {
-      sys.isMotorOn = false;
-      unsigned long dur = (now - motorStart) / 1000;
-      sys.lastRunDuration = dur;
-      bool isShort = (cfg.protectMode && dur < (unsigned long)cfg.shortCycleSec);
-      bool wasStall = sys.isStalled;
-      sys.isStalled = false;
-      sys.stallAlertSent = false;
-      cycleHistory[cycleIdx] = {dur, maxAmp, sys.peakAmp, isShort, wasStall};
-      cycleIdx = (cycleIdx + 1) % MAX_HISTORY;
-      cycleCount++;
-
-      if (wasStall) {
-        char m[60]; snprintf(m, 60, "!! STALL termino %lus / Pico:%.1fA", dur, sys.peakAmp);
-        addLog(m); fullDebug("STALL", m);
-      } else if (isShort) {
-        sys.shortCycleStreak++;
-        char m[50]; snprintf(m, 50, "!! CORTO %lus (x%d)", dur, sys.shortCycleStreak);
-        addLog(m); fullDebug("ALERTA", m);
+        <!-- ÍNDICE -->
+        <div class="nav-info">Navegación</div>
+        <h2>Tabla de Contenidos</h2>
         
-        // Cortar si hay 3 cortos seguidos
-        if (cfg.protectMode && sys.shortCycleStreak >= 3) {
-          if (!sys.protectionTripped) {
-            sys.protectionTripped = true;
-            sys.protectionTime = now;
-            prefs.begin("sp", false); prefs.putBool("tripped", true); prefs.end();
-            digitalWrite(PIN_RELAY, LOW); // Corta SSR
-            addLog("RELE: CORTE POR CORTOS MULTIPLES");
-            triggerBuzzer(BUZ_STALL); // Alerta grave
-          }
-        }
-      } else {
-        sys.shortCycleStreak = 0;
-        sys.totalStarts++;
-        sys.pendingPersist = true;
-        char m[60]; snprintf(m, 60, "OK %lus / %.1fA / Pico:%.1fA", dur, maxAmp, sys.peakAmp);
-        addLog(m); fullDebug("EVENT", m);
-      }
-      const char* evType = wasStall ? "MOTOR_CLAVADO" : (isShort ? "ALERTA_CORTO" : "CICLO_OK");
-      fetchThermoTemp(false);   // Captura temperatura del termostato al momento de corte
-      cloudUpload(maxAmp, dur, evType, "");
-      runDiagnostics();
-    }
-    lastSample = now;
-  }
+        <div class="card">
+            <div class="nav-info" style="color: var(--text-dim); margin-bottom: 10px;">Parte I: Manual de Usuario</div>
+            <div class="toc-list">
+                <a href="#ch1" class="toc-item"><span class="toc-num">1</span> Introducción y Descripción General</a>
+                <a href="#ch2" class="toc-item"><span class="toc-num">2</span> Encendido, Pantalla LCD y Primeros Pasos</a>
+                <a href="#ch3" class="toc-item"><span class="toc-num">3</span> Panel Web (Dashboard) Guía Completa</a>
+                <a href="#ch4" class="toc-item"><span class="toc-num">4</span> Sistema de Alertas y Sonidos del Buzzer</a>
+                <a href="#ch5" class="toc-item"><span class="toc-num">5</span> Botón Físico de Reset Triple Confirmación</a>
+                <a href="#ch6" class="toc-item"><span class="toc-num">6</span> Configuración Web Parámetros y Valores</a>
+                <a href="#ch7" class="toc-item"><span class="toc-num">7</span> Actualización OTA por WiFi</a>
+            </div>
 
-  sys.currentRunTime = sys.isMotorOn ? (now - motorStart) / 1000 : 0;
+            <div class="nav-info" style="color: var(--text-dim); margin-top: 40px; margin-bottom: 10px;">Parte II: Guía Técnica Avanzada</div>
+            <div class="toc-list">
+                <a href="#ch8" class="toc-item"><span class="toc-num">8</span> Lista de Componentes y Materiales</a>
+                <a href="#ch9" class="toc-item"><span class="toc-num">9</span> Pinout ESP32 y Especificaciones de Sensores</a>
+                <a href="#ch10" class="toc-item"><span class="toc-num">10</span> Lógica Interna y Los Trucos del Sistema</a>
+                <a href="#ch11" class="toc-item"><span class="toc-num">11</span> Integración con Google Sheets</a>
+                <a href="#ch12" class="toc-item"><span class="toc-num">12</span> Ecosistema Byte-ELECTRONICLAB</a>
+                <a href="#ch13" class="toc-item"><span class="toc-num">13</span> Compilación y Puesta en Marcha</a>
+                <a href="#ch14" class="toc-item"><span class="toc-num">14</span> Glosario y Referencia Técnica</a>
+            </div>
+        </div>
 
-  // Duty cycle: contar segundos encendido
-  if (now - lastOnCheck > 1000) {
-    if (sys.isMotorOn) totalOnTime++;
-    lastOnCheck = now;
-  }
+        <!-- CAPÍTULO 1 -->
+        <h3 id="ch1"><span class="chapter-num">1</span> Introducción y Descripción General</h3>
+        <div class="card">
+            <p>El Sentinel Pro es un sistema de protección y monitoreo inteligente para motores eléctricos. Protege compresores de heladeras, aires acondicionados y bombas contra las fallas más comunes que los destruyen prematuramente.</p>
+            
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <h4>Medición RMS Real</h4>
+                    <p>No picos, no promedios. Valor cuadrático medio verdadero con 2000 muestras/150ms.</p>
+                </div>
+                <div class="feature-card">
+                    <h4>Corte Inteligente</h4>
+                    <p>SSR de estado sólido sin partes mecánicas. Corte en microsegundos ante fallas.</p>
+                </div>
+                <div class="feature-card">
+                    <h4>Conectividad Total</h4>
+                    <p>WiFi, OTA, Google Sheets, NTP y comunicación con el Termostato Dual.</p>
+                </div>
+            </div>
 
-  persistStartsIfNeeded();
+            <h4>¿Qué problemas soluciona?</h4>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Falla</th>
+                            <th>Causa Típica</th>
+                            <th>Acción del Sentinel</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Motor clavado (Stall)</strong></td>
+                            <td>Rotor trabado, cap. arranque abierto</td>
+                            <td>Corta SSR + alerta sonora + log nube</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Ciclos cortos (Rateada)</strong></td>
+                            <td>Protector térmico, bajo voltaje</td>
+                            <td>Cuenta 3 cortos seguidos -> bloqueo</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Sobrecorriente</strong></td>
+                            <td>Cortocircuito, cable dañado</td>
+                            <td>Alerta inmediata + registro en nube</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Temperatura Crítica</strong></td>
+                            <td>Falla en refrigeración del motor</td>
+                            <td>Interlock con Termostato Dual (Corte remoto)</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Falla de gas / vacío</strong></td>
+                            <td>Fuga de refrigerante, filtro tapado</td>
+                            <td>Detecta consumo anómalo y corta</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
 
-  // Debug BT cada 2s
-  if (now - lastBT > 2000) {
-    char d[140];
-    snprintf(d, sizeof(d), "DBG> A:%.2f Raw:%d RMS:%.1f RAM:%lu M:%s T:%lu Z:%d",
-      sys.currentAmp, sys.lastRawAvg, sys.lastRMS, (unsigned long)ESP.getFreeHeap(),
-      sys.isMotorOn ? "ON" : "OFF", sys.totalStarts, cfg.zero);
-    Serial.println(d); 
-    #ifdef ENABLE_BT
-    SerialBT.println(d); 
-    #endif
-    lastBT = now;
-  }
+        <!-- CAPÍTULO 2 -->
+        <h3 id="ch2"><span class="chapter-num">2</span> Encendido y LCD</h3>
+        <div class="card">
+            <p>Al conectar el equipo, el Sentinel Pro realiza una rutina de diagnóstico:</p>
+            <ul>
+                <li><strong>Auto-Zero:</strong> Calibra el sensor ACS712 buscando el punto medio de 2.5V (RMS).</li>
+                <li><strong>WiFi Connect:</strong> Intenta conectarse a la red configurada. Si falla, genera su propio Punto de Acceso.</li>
+                <li><strong>LCD 16x2:</strong> Muestra el amperaje en tiempo real, el estado del motor y la IP asignada.</li>
+            </ul>
+            <div class="note">
+                💡 <strong>Truco:</strong> Si el LCD muestra "Calibrando..." y hay una carga conectada, el valor Zero será incorrecto. Asegúrate de encenderlo sin carga.
+            </div>
+        </div>
 
-// LCD cada 1s o modo confirmacion
-if (sys.resetConfirmState > 0) {
-    // Pantalla de confirmación
-    lcd.setCursor(0, 0);
-    if (sys.resetConfirmState == 1) {
-      lcd.print("Borrar contador?");
-      lcd.setCursor(0, 1);
-      lcd.print("[BOTON] 2 mas...");
-    } else {
-      lcd.print("Seguro en serio?");
-      lcd.setCursor(0, 1);
-      lcd.print("[BOTON] 1 mas...");
-    }
-} else if (now - lastLCD > 1000) {
-    static int refreshCounter = 0;
-    lastLCD = now; 
-    
-    // REFRESCADO PROFUNDO: Re-inicializar cada 300 segundos (5 min) si el motor está OFF
-    if (!sys.isMotorOn && ++refreshCounter > 300) {
-        lcd.init();
-        lcd.backlight();
-        refreshCounter = 0;
-    }
+        <!-- CAPÍTULO 3 -->
+        <h3 id="ch3"><span class="chapter-num">3</span> Dashboard Web</h3>
+        <div class="card">
+            <p>El dashboard v6.1.3 es el corazón del monitoreo. Incluye:</p>
+            <ul>
+                <li><strong>Gráfico Real-Time:</strong> Muestra la curva de consumo actual.</li>
+                <li><strong>Pico Máximo (Inrush):</strong> Captura el golpe de corriente inicial para diagnosticar capacitores débiles.</li>
+                <li><strong>Duty Cycle:</strong> Porcentaje de tiempo que el motor ha estado encendido desde el boot.</li>
+                <li><strong>Log de Eventos:</strong> Historial rápido de las últimas 8 acciones.</li>
+                <li><strong>Control de Nodos:</strong> Puedes ver y controlar el Termostato Dual directamente desde aquí.</li>
+            </ul>
+        </div>
 
-    // 1. Limpiamos la zona del amperaje antes de escribir
-    lcd.setCursor(2, 0);
-    lcd.print("     "); // Borra 5 espacios
+        <!-- CAPÍTULO 4 -->
+        <h3 id="ch4"><span class="chapter-num">4</span> Alertas y Buzzer</h3>
+        <div class="card">
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Evento</th>
+                            <th>Patrón de Sonido</th>
+                            <th>Descripción</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Boot / OK</strong></td>
+                            <td>2 beeps cortos</td>
+                            <td>Sistema estable e iniciado.</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Stall (Alerta)</strong></td>
+                            <td>Beep largo repetitivo</td>
+                            <td>Emergencia. Motor bloqueado.</td>
+                        </tr>
+                        <tr>
+                            <td><strong>WiFi Drop</strong></td>
+                            <td>3 beeps "decrecendo"</td>
+                            <td>Pérdida de conexión a internet.</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Alerta Termostato</strong></td>
+                            <td>Beep constante intermitente</td>
+                            <td>El nodo remoto reporta una falla grave.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
 
-    // 2. Escribimos el valor real
-    lcd.setCursor(0, 0);
-    lcd.print("A:"); 
-    lcd.print(sys.currentAmp, 2); 
-    
-    // 3. Posicionamos el Estado bien lejos (Columna 12)
-    lcd.setCursor(12, 0);
-    lcd.print(sys.isMotorOn ? " ON" : "OFF");
-    
-    // 4. Limpiar linea 1 para estática o proteccion
-    lcd.setCursor(0, 1);
-    lcd.print("                ");
-    lcd.setCursor(0, 1);
-    
-    // Si esta protegido, clavar alerta en la pantalla
-    if (sys.protectionTripped) {
-      if ((now / 1000) % 2 == 0) lcd.print("** PROTECCION **");
-      else lcd.print("                ");
-    } else {
-      // Fila 1 Fija: Encendidos e IP corta
-      lcd.print("C:"); 
-      lcd.print(sys.totalStarts);
-      lcd.print(" ");
+        <!-- CAPÍTULO 9 -->
+        <h3 id="ch9"><span class="chapter-num">9</span> Especificaciones Técnicas</h3>
+        <div class="card">
+            <h4>Sensores Utilizados</h4>
+            <ul>
+                <li><strong>ACS712 (Hall Effect):</strong> Sensor de corriente lineal. Soporta hasta 30A (ventanas de 5A, 20A o 30A según modelo).</li>
+                <li><strong>ESP32 (Core):</strong> Microcontrolador Dual Core que maneja la lógica de protección en un núcleo y la web en otro.</li>
+                <li><strong>LCD I2C:</strong> Dirección estándar 0x27. Usado para monitoreo local sin necesidad de celular.</li>
+                <li><strong>SSR 25A (Solid State Relay):</strong> Corte por cruce por cero para minimizar el arco eléctrico y el ruido.</li>
+            </ul>
+        </div>
 
-      int ultP = sys.ipAddr.lastIndexOf('.');
-      int penP = sys.ipAddr.lastIndexOf('.', ultP - 1);
-      String ipCorta = (penP != -1) ? sys.ipAddr.substring(penP + 1) : sys.ipAddr;
-      
-      lcd.setCursor(6, 1); // Movido de 7 a 6
-      lcd.print(sys.wifiModeAP ? "A:" : "I:");
-      lcd.print(ipCorta);
-      
-      // Mini-indicador de pico maximo en la esquina inferior derecha
-      // Desplazado a la derecha (Col 13) para evitar el solape
-      lcd.setCursor(13, 1); 
-      if (sys.peakAmp > 0) {
-        if (sys.peakAmp < 10.0) lcd.print(" "); // Alineacion
-        lcd.print(sys.peakAmp, 1);
-      }
-    }
-}
+        <!-- CAPÍTULO 10 -->
+        <h3 id="ch10"><span class="chapter-num">10</span> Los Trucos del Sistema</h3>
+        <div class="card">
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <h4>Anti-Flicker</h4>
+                    <p>El sistema espera 3 confirmaciones (450ms) antes de decidir que el motor cambió de estado.</p>
+                </div>
+                <div class="feature-card">
+                    <h4>I2C Inmune</h4>
+                    <p>Reloj bajado a 50kHz para evitar que los ruidos del compresor congelen el LCD.</p>
+                </div>
+                <div class="feature-card">
+                    <h4>WDT Inteligente</h4>
+                    <p>Watchdog configurado a 15s para permitir reintentos TCP sin resetear el equipo.</p>
+                </div>
+            </div>
+            <div class="warning">
+                ⚠️ <strong>Nota sobre 24h Test:</strong> El modo test fuerza un log a la nube cada 24 horas aunque no haya cambios, para verificar que la conexión sigue viva.
+            </div>
+        </div>
 
-  // Monitoreo del termostato (Cada 15s si el motor está ON para seguridad, sino cada 30s)
-  static unsigned long lastThermoPoll = 0;
-  unsigned long pollInterval = sys.isMotorOn ? 15000 : 30000;
-  if (now - lastThermoPoll > pollInterval) {
-      fetchThermoTemp(false); 
-      lastThermoPoll = now;
-  }
+        <!-- CAPÍTULO 11 -->
+        <h3 id="ch11"><span class="chapter-num">11</span> Integración Cloud</h3>
+        <div class="card">
+            <p>Usamos Google Apps Script para registrar cada arranque y parada. Los datos enviados incluyen:</p>
+            <ul>
+                <li>Amperaje de trabajo y Pico inicial.</li>
+                <li>Duración exacta del ciclo (segundos).</li>
+                <li>Motivo del Boot (Power-On, Brownout, WDT).</li>
+                <li>Temperaturas S1 y S2 del termostato vinculado en el momento del evento.</li>
+            </ul>
+        </div>
 
-  // WiFi reconnect cada 30s (o 5 min si esta en modo AP)
-  unsigned long wifiInterval = sys.wifiModeAP ? 300000 : 30000;
-  if (now - lastWiFi > wifiInterval) {
-    if (WiFi.status() != WL_CONNECTED) {
-      fullDebug("NET", "Reconectando...");
-      if (!sys.wifiModeAP) triggerBuzzer(BUZ_WIFI_DROP);
-      WiFi.disconnect();
-      WiFi.mode(WIFI_STA);
-      WiFi.begin(cfg.ssid.c_str(), cfg.pass.c_str());
-      int r = 0;
-      while (WiFi.status() != WL_CONNECTED && r < 10) { delay(500); r++; esp_task_wdt_reset(); }
-      if (WiFi.status() == WL_CONNECTED) { 
-        sys.wifiModeAP = false;
-        sys.ipAddr = WiFi.localIP().toString(); 
-        fullDebug("NET", ("OK:" + sys.ipAddr).c_str()); 
-        addLog(("WiFi:" + sys.ipAddr).c_str());
-      } else { 
-        fullDebug("NET", "Fallo"); 
-        if (sys.wifiModeAP) {
-          WiFi.mode(WIFI_AP); // Restaurar AP si fallo
-          WiFi.softAP("Sentinel_Pro", "12345678");
-        }
-      }
-    }
-    lastWiFi = now;
-  }
-}
+    </div>
+
+    <footer>
+        <p>Byte-ELECTRONICLAB | Sentinel Pro Ecosystem</p>
+        <p>Documentación Generada: v6.1.3 - Abril 2026</p>
+        <p>Márgenes recomendados para PDF: Mínimos (90% escala)</p>
+    </footer>
+
+</body>
+</html>
