@@ -3,533 +3,451 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sentinel Pro v6.1.3 | Documentación Oficial Premium</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <title>Sentinel Pro v6.2.7 | Mega Manual de Usuario e Ingeniería</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --primary: #00aaff;
-            --primary-glow: rgba(0, 170, 255, 0.4);
+            --primary: #3d8bfd;
+            --primary-glow: rgba(61, 139, 253, 0.4);
             --secondary: #00ffcc;
             --accent: #f59e0b;
             --danger: #ef4444;
             --success: #10b981;
-            --dark-bg: #020617;
-            --card-bg: rgba(15, 23, 42, 0.6);
+            --dark-bg: #050a18;
+            --card-bg: rgba(15, 23, 42, 0.8);
             --text-main: #f8fafc;
             --text-dim: #94a3b8;
             --border: rgba(255, 255, 255, 0.1);
-            --glass-bg: rgba(255, 255, 255, 0.02);
         }
 
         * {
             box-sizing: border-box;
             -webkit-font-smoothing: antialiased;
+            scroll-behavior: smooth;
         }
 
         body {
-            font-family: 'Inter', sans-serif;
-            background-color: var(--dark-bg);
+            font-family: 'Outfit', sans-serif;
+            background-color: #050a18;
             background-image: 
-                radial-gradient(circle at 10% 20%, rgba(0, 170, 255, 0.05) 0%, transparent 40%),
-                radial-gradient(circle at 90% 80%, rgba(0, 255, 204, 0.05) 0%, transparent 40%);
+                radial-gradient(circle at 10% 20%, rgba(0, 170, 255, 0.08) 0%, transparent 50%),
+                radial-gradient(circle at 90% 80%, rgba(0, 255, 204, 0.08) 0%, transparent 50%);
             color: var(--text-main);
-            line-height: 1.6;
+            line-height: 1.8;
             margin: 0;
             padding: 0;
             overflow-x: hidden;
         }
 
-        /* --- PORTADA --- */
-        .cover {
+        /* --- HERO SECTION --- */
+        .hero {
             height: 100vh;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
             text-align: center;
-            padding: 20px;
+            padding: 40px;
+            background: #050a18;
             position: relative;
-            background: radial-gradient(circle at center, #0f172a 0%, #020617 100%);
         }
 
-        .brand-badge {
-            background: rgba(0, 170, 255, 0.1);
-            border: 1px solid var(--primary);
-            color: var(--primary);
-            padding: 8px 20px;
+        .top-badge {
+            border: 1px solid #3d8bfd;
+            color: #3d8bfd;
+            padding: 10px 40px;
             border-radius: 100px;
             font-size: 0.75rem;
             font-weight: 700;
-            letter-spacing: 2px;
+            letter-spacing: 3px;
             text-transform: uppercase;
-            margin-bottom: 30px;
-            backdrop-filter: blur(5px);
+            margin-bottom: 50px;
+            background: rgba(61, 139, 253, 0.05);
         }
 
         .logo-box {
-            width: 120px;
-            height: 120px;
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
-            border-radius: 30px;
-            margin-bottom: 40px;
-            box-shadow: 0 0 50px var(--primary-glow);
+            width: 140px;
+            height: 140px;
+            background: linear-gradient(135deg, #00d2ff, #3a7bd5);
+            border-radius: 40px;
+            margin-bottom: 60px;
+            box-shadow: 0 0 60px rgba(0, 210, 255, 0.4);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 3rem;
+            font-size: 4rem;
             color: white;
             font-weight: 800;
         }
 
-        .cover h1 {
-            font-size: 4rem;
+        .hero h1 {
+            font-size: clamp(3.5rem, 12vw, 6rem);
             font-weight: 800;
             margin: 0;
             letter-spacing: -3px;
-            background: linear-gradient(to right, #fff, #94a3b8);
+            color: #ffffff;
+            background: linear-gradient(to right, #fff 60%, #94a3b8);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
 
-        .cover .version {
-            font-size: 1.5rem;
-            color: var(--primary);
-            font-weight: 600;
-            margin-top: 10px;
-        }
-
-        .cover p {
-            max-width: 600px;
-            color: var(--text-dim);
-            font-size: 1.1rem;
-            margin-top: 25px;
-        }
-
-        /* --- CONTENEDOR GENERAL --- */
-        .content {
-            max-width: 1000px;
-            margin: 0 auto;
-            padding: 60px 20px;
-        }
-
-        /* --- CRUMBS / NAVIGATION --- */
-        .nav-info {
-            color: var(--primary);
-            font-size: 0.8rem;
+        .hero .evolution {
+            font-size: 2.2rem;
+            color: #00ffcc;
+            font-family: 'JetBrains Mono', monospace;
+            margin-top: 15px;
             font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 3px;
-            margin-bottom: 20px;
         }
+
+        .hero p {
+            max-width: 800px;
+            color: var(--text-dim);
+            font-size: 1.15rem;
+            margin-top: 30px;
+        }
+
+        .bottom-badges {
+            display: flex;
+            gap: 15px;
+            margin-top: 60px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .b-badge {
+            border: 1px solid;
+            padding: 10px 25px;
+            border-radius: 8px;
+            font-size: 0.72rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .b-blue { border-color: #3d8bfd; color: #3d8bfd; }
+        .b-green { border-color: #00ffcc; color: #00ffcc; }
+        .b-orange { border-color: #f59e0b; color: #f59e0b; }
+
+        .scroll-text {
+            position: absolute;
+            bottom: 40px;
+            font-size: 0.7rem;
+            color: var(--text-dim);
+            letter-spacing: 3px;
+            text-transform: uppercase;
+        }
+
+        /* --- CONTENT --- */
+        .main-content {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 80px 24px;
+        }
+
+        section { margin-bottom: 120px; }
 
         h2 {
-            font-size: 2.8rem;
+            font-size: clamp(2.5rem, 6vw, 4rem);
             font-weight: 800;
-            margin-bottom: 40px;
-            letter-spacing: -1px;
+            margin-bottom: 60px;
+            letter-spacing: -2px;
+            border-left: 10px solid var(--primary);
+            padding-left: 30px;
         }
 
         h3 {
-            font-size: 1.8rem;
+            font-size: 2rem;
             color: var(--primary);
-            margin-top: 60px;
-            margin-bottom: 20px;
+            margin-top: 80px;
+            margin-bottom: 30px;
             display: flex;
             align-items: center;
-            gap: 15px;
+            gap: 20px;
         }
 
-        .chapter-num {
-            background: var(--primary);
-            color: var(--dark-bg);
-            width: 35px;
-            height: 35px;
+        .part-badge {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: black;
+            padding: 6px 15px;
             border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1rem;
+            font-size: 0.9rem;
             font-weight: 800;
+            text-transform: uppercase;
+            margin-bottom: 20px;
+            display: inline-block;
         }
 
-        /* --- CARDS --- */
         .card {
             background: var(--card-bg);
             border: 1px solid var(--border);
+            border-radius: 32px;
+            padding: 60px;
+            margin-bottom: 50px;
+            backdrop-filter: blur(20px);
+            box-shadow: 0 40px 80px rgba(0,0,0,0.5);
+            position: relative;
+        }
+
+        .example-box {
+            background: rgba(16, 185, 129, 0.05);
+            border: 2px dashed var(--success);
+            padding: 30px;
+            border-radius: 20px;
+            margin: 30px 0;
+        }
+
+        .example-box h5 { color: var(--success); margin: 0 0 15px 0; font-size: 1.1rem; text-transform: uppercase; }
+
+        .graphic-container {
+            background: #020617;
             border-radius: 24px;
             padding: 40px;
-            margin-bottom: 40px;
-            backdrop-filter: blur(10px);
-            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            margin: 40px 0;
+            text-align: center;
+            border: 1px solid var(--border);
         }
 
-        .toc-list {
-            list-style: none;
-            padding: 0;
-        }
-
-        .toc-item {
-            display: flex;
-            align-items: center;
-            gap: 20px;
-            padding: 15px 0;
-            border-bottom: 1px solid var(--border);
-            text-decoration: none;
-            color: var(--text-main);
-            transition: 0.3s;
-        }
-
-        .toc-item:hover {
-            transform: translateX(10px);
-            color: var(--primary);
-        }
-
-        .toc-num {
-            background: #1e293b;
-            color: var(--text-main);
-            width: 30px;
-            height: 30px;
-            border-radius: 6px;
+        /* --- CSS GRAPHICS --- */
+        .wave-graphic {
+            height: 100px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-weight: 700;
-            font-size: 0.8rem;
+            gap: 5px;
         }
-
-        /* --- TABLAS --- */
-        .table-wrapper {
-            overflow-x: auto;
-            border-radius: 16px;
-            border: 1px solid var(--border);
-            margin: 30px 0;
+        .wave-bar {
+            width: 4px;
+            background: var(--primary);
+            border-radius: 10px;
+            animation: wave-anim 1.5s infinite ease-in-out;
         }
+        @keyframes wave-anim { 0%, 100% { height: 20px; } 50% { height: 80px; } }
 
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            text-align: left;
-            background: rgba(0,0,0,0.2);
-        }
-
-        th {
-            background: rgba(0, 170, 255, 0.1);
-            color: var(--primary);
-            padding: 20px;
-            font-size: 0.8rem;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        td {
-            padding: 20px;
-            border-bottom: 1px solid var(--border);
-            font-size: 0.95rem;
-        }
-
-        tr:last-child td { border-bottom: none; }
-
-        /* --- ALERTAS --- */
-        .note {
-            background: rgba(0, 170, 255, 0.05);
-            border-left: 4px solid var(--primary);
-            padding: 25px;
-            border-radius: 0 16px 16px 0;
-            margin: 30px 0;
-        }
-
-        .warning {
-            background: rgba(245, 158, 11, 0.05);
-            border-left: 4px solid var(--accent);
-            padding: 25px;
-            border-radius: 0 16px 16px 0;
-            margin: 30px 0;
-        }
-
-        .feature-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 20px;
+        .timeline {
+            display: flex;
+            align-items: center;
             margin: 40px 0;
+            position: relative;
         }
-
-        .feature-card {
-            background: linear-gradient(135deg, rgba(255,255,255,0.03) 0%, transparent 100%);
-            border: 1px solid var(--border);
-            padding: 30px;
-            border-radius: 20px;
+        .time-node {
+            width: 20px;
+            height: 20px;
+            background: var(--primary);
+            border-radius: 50%;
+            position: relative;
         }
+        .time-line { flex: 1; height: 2px; background: var(--border); }
+        .node-label { position: absolute; top: 30px; left: -20px; font-size: 0.75rem; white-space: nowrap; color: var(--text-dim); }
 
-        .feature-card h4 {
-            color: var(--primary);
-            margin-top: 0;
-            font-size: 1.2rem;
-            margin-bottom: 10px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        .feature-card p {
-            margin: 0;
-            color: var(--text-dim);
-            font-size: 0.9rem;
-        }
-
-        .badge {
-            padding: 4px 12px;
-            border-radius: 6px;
-            font-size: 0.7rem;
-            font-weight: 800;
-            text-transform: uppercase;
-            display: inline-block;
-            margin-right: 5px;
-        }
-
-        .badge-primary { background: var(--primary); color: var(--dark-bg); }
-        .badge-secondary { background: var(--secondary); color: var(--dark-bg); }
-
+        /* --- FOOTER --- */
         footer {
             text-align: center;
-            padding: 100px 20px;
+            padding: 120px 24px;
+            background: #050a18;
+            color: #ffffff;
             border-top: 1px solid var(--border);
-            color: var(--text-dim);
-            font-size: 0.9rem;
         }
 
-        @media (max-width: 768px) {
-            .cover h1 { font-size: 2.8rem; }
-            h2 { font-size: 2rem; }
-            .card { padding: 25px; }
-        }
+        .f-main { font-size: 1.4rem; font-weight: 700; margin-bottom: 15px; }
+        .f-secondary { font-size: 1.2rem; margin-bottom: 25px; font-weight: 300; }
+        .f-bottom { font-size: 0.9rem; text-transform: uppercase; letter-spacing: 3px; opacity: 0.6; }
+
+        .t-wrap { overflow-x: auto; border-radius: 20px; border: 1px solid var(--border); margin: 30px 0; background: rgba(0,0,0,0.3); }
+        table { width: 100%; border-collapse: collapse; text-align: left; }
+        th { background: rgba(61, 139, 253, 0.15); color: var(--primary); padding: 25px; font-size: 0.85rem; text-transform: uppercase; }
+        td { padding: 25px; border-bottom: 1px solid var(--border); font-size: 1rem; }
     </style>
 </head>
 <body>
 
-    <!-- PÁGINA 1: PORTADA -->
-    <section class="cover">
-        <div class="brand-badge">BYTE-ELECTRONICLAB DOCUMENTACIÓN OFICIAL</div>
+    <!-- CABECERA -->
+    <section class="hero">
+        <div class="top-badge">BYTE-ELECTRONICLAB | DIVISIÓN INGENIERÍA</div>
         <div class="logo-box">S</div>
         <h1>SENTINEL PRO</h1>
-        <div class="version">v6.1.3 Edición Integrada</div>
-        <p>Monitor de Carga Inteligente con Protección de Grado Profesional para Motores y Compresores.</p>
+        <div class="evolution">Firmware Evolution v6.2.7</div>
+        <p>Sistema de Monitoreo Industrial con Análisis de Salud de Aislación y Diagnóstico de Motores por Inteligencia de Ciclo.</p>
         
-        <div style="display: flex; gap: 10px; margin-top: 40px; flex-wrap: wrap; justify-content: center;">
-            <span class="badge badge-secondary">ACS712 + ESP32</span>
-            <span class="badge badge-secondary">WIFI + OTA</span>
-            <span class="badge badge-secondary">TERMOSTATO DUAL COMPATIBLE</span>
-            <span class="badge badge-secondary">GOOGLE SHEETS</span>
-            <span class="badge badge-secondary">SSR 25A</span>
+        <div class="bottom-badges">
+            <div class="b-badge b-blue">MODO OSCURO PREMIUM</div>
+            <div class="b-badge b-green">HEALTH SCORE ENGINE</div>
+            <div class="b-badge b-orange">BINARY BACKUP SYSTEM</div>
         </div>
+
+        <div class="scroll-text">DESLIZA PARA EL MEGA MANUAL COMPLETO</div>
     </section>
 
-    <div class="content">
-        
-        <!-- ÍNDICE -->
-        <div class="nav-info">Navegación</div>
-        <h2>Tabla de Contenidos</h2>
-        
-        <div class="card">
-            <div class="nav-info" style="color: var(--text-dim); margin-bottom: 10px;">Parte I: Manual de Usuario</div>
-            <div class="toc-list">
-                <a href="#ch1" class="toc-item"><span class="toc-num">1</span> Introducción y Descripción General</a>
-                <a href="#ch2" class="toc-item"><span class="toc-num">2</span> Encendido, Pantalla LCD y Primeros Pasos</a>
-                <a href="#ch3" class="toc-item"><span class="toc-num">3</span> Panel Web (Dashboard) Guía Completa</a>
-                <a href="#ch4" class="toc-item"><span class="toc-num">4</span> Sistema de Alertas y Sonidos del Buzzer</a>
-                <a href="#ch5" class="toc-item"><span class="toc-num">5</span> Botón Físico de Reset Triple Confirmación</a>
-                <a href="#ch6" class="toc-item"><span class="toc-num">6</span> Configuración Web Parámetros y Valores</a>
-                <a href="#ch7" class="toc-item"><span class="toc-num">7</span> Actualización OTA por WiFi</a>
-            </div>
+    <div class="main-content">
 
-            <div class="nav-info" style="color: var(--text-dim); margin-top: 40px; margin-bottom: 10px;">Parte II: Guía Técnica Avanzada</div>
-            <div class="toc-list">
-                <a href="#ch8" class="toc-item"><span class="toc-num">8</span> Lista de Componentes y Materiales</a>
-                <a href="#ch9" class="toc-item"><span class="toc-num">9</span> Pinout ESP32 y Especificaciones de Sensores</a>
-                <a href="#ch10" class="toc-item"><span class="toc-num">10</span> Lógica Interna y Los Trucos del Sistema</a>
-                <a href="#ch11" class="toc-item"><span class="toc-num">11</span> Integración con Google Sheets</a>
-                <a href="#ch12" class="toc-item"><span class="toc-num">12</span> Ecosistema Byte-ELECTRONICLAB</a>
-                <a href="#ch13" class="toc-item"><span class="toc-num">13</span> Compilación y Puesta en Marcha</a>
-                <a href="#ch14" class="toc-item"><span class="toc-num">14</span> Glosario y Referencia Técnica</a>
-            </div>
-        </div>
-
-        <!-- CAPÍTULO 1 -->
-        <h3 id="ch1"><span class="chapter-num">1</span> Introducción y Descripción General</h3>
-        <div class="card">
-            <p>El Sentinel Pro es un sistema de protección y monitoreo inteligente para motores eléctricos. Protege compresores de heladeras, aires acondicionados y bombas contra las fallas más comunes que los destruyen prematuramente.</p>
+        <!-- PARTE I: MANUAL DE USUARIO (USO DIARIO) -->
+        <section id="usuario">
+            <div class="part-badge">Parte I: Manual de Uso Diario (Para el Propietario)</div>
+            <h2>Dominando tu Sentinel Pro</h2>
             
-            <div class="feature-grid">
-                <div class="feature-card">
-                    <h4>Medición RMS Real</h4>
-                    <p>No picos, no promedios. Valor cuadrático medio verdadero con 2000 muestras/150ms.</p>
+            <div class="card">
+                <h3>1. Primer Contacto: ¿Qué veo en mi aparato?</h3>
+                <p>El Sentinel Pro tiene una pantalla de cristal líquido que te informa el estado de tu equipo las 24 horas. Aquí no hay códigos raros, solo información útil:</p>
+                
+                <div class="t-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Mensaje</th>
+                                <th>Significado Real</th>
+                                <th>Ejemplo</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>0.0 A</strong></td>
+                                <td>El motor está apagado y descansando.</td>
+                                <td>La heladera llegó a la temperatura deseada.</td>
+                            </tr>
+                            <tr>
+                                <td><strong>1.5 A (Variable)</strong></td>
+                                <td>El motor está encendido y enfriando.</td>
+                                <td>Consumo normal de un motor de 1/4 HP.</td>
+                            </tr>
+                            <tr>
+                                <td><strong>TOTAL: 24</strong></td>
+                                <td>Cuántas veces arrancó en el día.</td>
+                                <td>Si este número sube muy rápido, revisa los burletes.</td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
-                <div class="feature-card">
-                    <h4>Corte Inteligente</h4>
-                    <p>SSR de estado sólido sin partes mecánicas. Corte en microsegundos ante fallas.</p>
+
+                <div class="example-box">
+                    <h5>💡 Ejemplo Práctico de Ahorro</h5>
+                    <p>Si notas que tu Sentinel marca <strong>TOTAL: 80</strong> en un solo día, tu heladera está arrancando demasiado seguido. Esto suele ser porque la puerta no cierra bien o le falta gas. El Sentinel te está avisando que estás gastando luz de más.</p>
                 </div>
-                <div class="feature-card">
-                    <h4>Conectividad Total</h4>
-                    <p>WiFi, OTA, Google Sheets, NTP y comunicación con el Termostato Dual.</p>
+
+                <h3>2. Las Alarmas: ¿Qué hacer si suena?</h3>
+                <p>Tu Sentinel es un guardaespaldas. Si suena, es porque salvó al motor de morir. </p>
+                <div class="graphic-container">
+                    <div style="font-size: 3rem; margin-bottom: 20px;">🔔</div>
+                    <div style="color: var(--danger); font-weight: 800; font-size: 1.5rem;">PITIDO LARGO = ACCIÓN REQUERIDA</div>
+                    <p style="margin-top: 20px;">El equipo cortó la luz para que el motor no se prenda fuego.</p>
                 </div>
+
+                <p><strong>Pasos para Rearmar:</strong></p>
+                <ol>
+                    <li>Entra al panel web desde tu teléfono.</li>
+                    <li>Verás un botón <strong>ROJO</strong> gigante que dice "REARMAR".</li>
+                    <li>Presiónalo. El motor intentará arrancar de nuevo.</li>
+                    <li><strong>IMPORTANTE:</strong> Si el motor intenta arrancar y el Sentinel lo vuelve a cortar a los 2 segundos, <strong>NO lo rearmes más</strong>. Llama a un técnico porque el motor está trabado eléctricamente.</li>
+                </ol>
             </div>
+        </section>
 
-            <h4>¿Qué problemas soluciona?</h4>
-            <div class="table-wrapper">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Falla</th>
-                            <th>Causa Típica</th>
-                            <th>Acción del Sentinel</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td><strong>Motor clavado (Stall)</strong></td>
-                            <td>Rotor trabado, cap. arranque abierto</td>
-                            <td>Corta SSR + alerta sonora + log nube</td>
-                        </tr>
-                        <tr>
-                            <td><strong>Ciclos cortos (Rateada)</strong></td>
-                            <td>Protector térmico, bajo voltaje</td>
-                            <td>Cuenta 3 cortos seguidos -> bloqueo</td>
-                        </tr>
-                        <tr>
-                            <td><strong>Sobrecorriente</strong></td>
-                            <td>Cortocircuito, cable dañado</td>
-                            <td>Alerta inmediata + registro en nube</td>
-                        </tr>
-                        <tr>
-                            <td><strong>Temperatura Crítica</strong></td>
-                            <td>Falla en refrigeración del motor</td>
-                            <td>Interlock con Termostato Dual (Corte remoto)</td>
-                        </tr>
-                        <tr>
-                            <td><strong>Falla de gas / vacío</strong></td>
-                            <td>Fuga de refrigerante, filtro tapado</td>
-                            <td>Detecta consumo anómalo y corta</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <!-- CAPÍTULO 2 -->
-        <h3 id="ch2"><span class="chapter-num">2</span> Encendido y LCD</h3>
-        <div class="card">
-            <p>Al conectar el equipo, el Sentinel Pro realiza una rutina de diagnóstico:</p>
-            <ul>
-                <li><strong>Auto-Zero:</strong> Calibra el sensor ACS712 buscando el punto medio de 2.5V (RMS).</li>
-                <li><strong>WiFi Connect:</strong> Intenta conectarse a la red configurada. Si falla, genera su propio Punto de Acceso.</li>
-                <li><strong>LCD 16x2:</strong> Muestra el amperaje en tiempo real, el estado del motor y la IP asignada.</li>
-            </ul>
-            <div class="note">
-                💡 <strong>Truco:</strong> Si el LCD muestra "Calibrando..." y hay una carga conectada, el valor Zero será incorrecto. Asegúrate de encenderlo sin carga.
-            </div>
-        </div>
-
-        <!-- CAPÍTULO 3 -->
-        <h3 id="ch3"><span class="chapter-num">3</span> Dashboard Web</h3>
-        <div class="card">
-            <p>El dashboard v6.1.3 es el corazón del monitoreo. Incluye:</p>
-            <ul>
-                <li><strong>Gráfico Real-Time:</strong> Muestra la curva de consumo actual.</li>
-                <li><strong>Pico Máximo (Inrush):</strong> Captura el golpe de corriente inicial para diagnosticar capacitores débiles.</li>
-                <li><strong>Duty Cycle:</strong> Porcentaje de tiempo que el motor ha estado encendido desde el boot.</li>
-                <li><strong>Log de Eventos:</strong> Historial rápido de las últimas 8 acciones.</li>
-                <li><strong>Control de Nodos:</strong> Puedes ver y controlar el Termostato Dual directamente desde aquí.</li>
-            </ul>
-        </div>
-
-        <!-- CAPÍTULO 4 -->
-        <h3 id="ch4"><span class="chapter-num">4</span> Alertas y Buzzer</h3>
-        <div class="card">
-            <div class="table-wrapper">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Evento</th>
-                            <th>Patrón de Sonido</th>
-                            <th>Descripción</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td><strong>Boot / OK</strong></td>
-                            <td>2 beeps cortos</td>
-                            <td>Sistema estable e iniciado.</td>
-                        </tr>
-                        <tr>
-                            <td><strong>Stall (Alerta)</strong></td>
-                            <td>Beep largo repetitivo</td>
-                            <td>Emergencia. Motor bloqueado.</td>
-                        </tr>
-                        <tr>
-                            <td><strong>WiFi Drop</strong></td>
-                            <td>3 beeps "decrecendo"</td>
-                            <td>Pérdida de conexión a internet.</td>
-                        </tr>
-                        <tr>
-                            <td><strong>Alerta Termostato</strong></td>
-                            <td>Beep constante intermitente</td>
-                            <td>El nodo remoto reporta una falla grave.</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <!-- CAPÍTULO 9 -->
-        <h3 id="ch9"><span class="chapter-num">9</span> Especificaciones Técnicas</h3>
-        <div class="card">
-            <h4>Sensores Utilizados</h4>
-            <ul>
-                <li><strong>ACS712 (Hall Effect):</strong> Sensor de corriente lineal. Soporta hasta 30A (ventanas de 5A, 20A o 30A según modelo).</li>
-                <li><strong>ESP32 (Core):</strong> Microcontrolador Dual Core que maneja la lógica de protección en un núcleo y la web en otro.</li>
-                <li><strong>LCD I2C:</strong> Dirección estándar 0x27. Usado para monitoreo local sin necesidad de celular.</li>
-                <li><strong>SSR 25A (Solid State Relay):</strong> Corte por cruce por cero para minimizar el arco eléctrico y el ruido.</li>
-            </ul>
-        </div>
-
-        <!-- CAPÍTULO 10 -->
-        <h3 id="ch10"><span class="chapter-num">10</span> Los Trucos del Sistema</h3>
-        <div class="card">
-            <div class="feature-grid">
-                <div class="feature-card">
-                    <h4>Anti-Flicker</h4>
-                    <p>El sistema espera 3 confirmaciones (450ms) antes de decidir que el motor cambió de estado.</p>
+        <!-- PARTE II: MANUAL TECNICO (INGENIERIA) -->
+        <section id="tecnico">
+            <div class="part-badge">Parte II: Manual Técnico de Ingeniería (Para el Instalador)</div>
+            <h2>Arquitectura y Algoritmos</h2>
+            
+            <div class="card">
+                <h3>1. Procesamiento DSP y True RMS</h3>
+                <p>El Sentinel Pro no estima el consumo; lo procesa digitalmente. El sensor Hall ACS712 envía una señal analógica que el ESP32 digitaliza a alta velocidad.</p>
+                
+                <div class="graphic-container">
+                    <div class="wave-graphic">
+                        <div class="wave-bar" style="animation-delay: 0.1s"></div>
+                        <div class="wave-bar" style="animation-delay: 0.2s"></div>
+                        <div class="wave-bar" style="animation-delay: 0.3s"></div>
+                        <div class="wave-bar" style="animation-delay: 0.4s"></div>
+                        <div class="wave-bar" style="animation-delay: 0.5s"></div>
+                        <div class="wave-bar" style="animation-delay: 0.6s"></div>
+                        <div class="wave-bar" style="animation-delay: 0.7s"></div>
+                        <div class="wave-bar" style="animation-delay: 0.8s"></div>
+                    </div>
+                    <p style="margin-top: 20px; color: var(--secondary); font-weight: 700;">PROCESAMIENTO DE 2000 MUESTRAS POR CICLO</p>
                 </div>
-                <div class="feature-card">
-                    <h4>I2C Inmune</h4>
-                    <p>Reloj bajado a 50kHz para evitar que los ruidos del compresor congelen el LCD.</p>
+
+                <p><strong>¿Por qué es importante?</strong> Los motores generan ruidos y armónicos. Un protector común fallaría por lecturas falsas. El Sentinel integra la curva de corriente para obtener el valor RMS real.</p>
+
+                <h3>2. Protección de Ciclos Cortos (Short Cycle)</h3>
+                <p>Este algoritmo previene que el motor intente arrancar repetidamente contra una presión de gas alta (lo cual quemaría el bobinado de arranque).</p>
+                
+                <div class="example-box">
+                    <h5>⚙️ Lógica de Bloqueo</h5>
+                    <p>Si <code>Tiempo_Marcha < 8 segundos</code>, el sistema marca un "Evento de Ciclo Corto". Al llegar a <strong>3 eventos seguidos</strong>, el SSR se abre permanentemente y requiere rearmado manual.</p>
                 </div>
-                <div class="feature-card">
-                    <h4>WDT Inteligente</h4>
-                    <p>Watchdog configurado a 15s para permitir reintentos TCP sin resetear el equipo.</p>
+
+                <h3>3. Health Score Engine (Salud Térmica)</h3>
+                <p>Esta es la función más avanzada de la v6.2.7. Analiza la inercia térmica del sistema.</p>
+                <div class="graphic-container">
+                    <div style="height: 10px; width: 100%; background: #1e293b; border-radius: 10px; overflow: hidden; position: relative;">
+                        <div style="height: 100%; width: 85%; background: linear-gradient(to right, var(--danger), var(--success));"></div>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-top: 10px; font-size: 0.8rem;">
+                        <span>CRÍTICO</span>
+                        <span>NORMAL</span>
+                        <span>ÓPTIMO (85%)</span>
+                    </div>
+                </div>
+                <p>El sistema mide el tiempo de descanso promedio. Si detecta que los descansos se acortan más de un 40% sin que suba la temperatura ambiente, asume que hay una falla en la aislación o burletes.</p>
+            </div>
+        </section>
+
+        <!-- CONFIGURACIÓN MAESTRA -->
+        <section id="config">
+            <h2>3. Configuración y Parámetros</h2>
+            <div class="card">
+                <p>El panel de configuración permite tunear el equipo para cualquier motor (desde una heladera familiar hasta un chiller industrial).</p>
+                
+                <div class="t-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Parámetro</th>
+                                <th>Uso Técnico</th>
+                                <th>Valor Recomendado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>Zero Amps</strong></td>
+                                <td>Calibración del sensor sin carga.</td>
+                                <td>2048 - 2500 (Auto)</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Trigger Amps</strong></td>
+                                <td>Amperaje máximo antes de disparar alarma.</td>
+                                <td>1.5x Amperaje Nominal</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Min Watts (minwa)</strong></td>
+                                <td>Detecta motor girando en vacío (fuga de gas).</td>
+                                <td>0.3A para heladeras</td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
-            <div class="warning">
-                ⚠️ <strong>Nota sobre 24h Test:</strong> El modo test fuerza un log a la nube cada 24 horas aunque no haya cambios, para verificar que la conexión sigue viva.
-            </div>
-        </div>
+        </section>
 
-        <!-- CAPÍTULO 11 -->
-        <h3 id="ch11"><span class="chapter-num">11</span> Integración Cloud</h3>
-        <div class="card">
-            <p>Usamos Google Apps Script para registrar cada arranque y parada. Los datos enviados incluyen:</p>
-            <ul>
-                <li>Amperaje de trabajo y Pico inicial.</li>
-                <li>Duración exacta del ciclo (segundos).</li>
-                <li>Motivo del Boot (Power-On, Brownout, WDT).</li>
-                <li>Temperaturas S1 y S2 del termostato vinculado en el momento del evento.</li>
-            </ul>
-        </div>
+        <!-- SOPORTE Y FALLAS -->
+        <section id="soporte">
+            <h2>4. Resolución de Problemas (FAQ)</h2>
+            <div class="card">
+                <p><strong>P: La pantalla muestra letras chinas o símbolos raros.</strong></p>
+                <p>R: Es interferencia eléctrica (EMI). El Sentinel tiene un sistema de <strong>Self-Healing</strong> que repara la pantalla automáticamente cada 2 minutos. No afecta la protección.</p>
+                
+                <p><strong>P: El WiFi no conecta.</strong></p>
+                <p>R: Si el router está muy lejos, el equipo activa el <strong>Modo AP</strong> (Punto de Acceso). Conéctate a la red "Sentinel_Pro" para configurar el WiFi de nuevo.</p>
+
+                <p><strong>P: ¿Cómo actualizo el firmware?</strong></p>
+                <p>R: Descarga primero tu backup desde la pestaña OTA. Luego sube el nuevo <code>.bin</code>. Si algo falla, puedes volver al backup en segundos.</p>
+            </div>
+        </section>
 
     </div>
 
+    <!-- PIE DE PAGINA -->
     <footer>
-        <p>Byte-ELECTRONICLAB | Sentinel Pro Ecosystem</p>
-        <p>Documentación: v6.1.3 - Abril 2026</p>
-        <p>Márgenes recomendados para PDF: Mínimos (90% escala)</p>
+        <div class="f-main">Sentinel Pro Ecosystem | Diseñado por Byte-ELECTRONICLAB</div>
+        <div class="f-secondary">Documentación v6.2.7 - Generada en Abril de 2026</div>
+        <div class="f-bottom">INGENIERÍA ARGENTINA | DESARROLLO DE ALTA PERFORMANCE</div>
     </footer>
 
 </body>
