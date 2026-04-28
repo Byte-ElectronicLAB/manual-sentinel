@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sentinel Pro v6.2.7 | Mega Manual de Usuario e Ingeniería</title>
+    <title>Sentinel Pro v6.3.0 | Mega Manual de Usuario e Ingeniería</title>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -265,13 +265,13 @@
         <div class="top-badge">BYTE-ELECTRONICLAB | DIVISIÓN INGENIERÍA</div>
         <div class="logo-box">S</div>
         <h1>SENTINEL PRO</h1>
-        <div class="evolution">Firmware Evolution v6.2.7</div>
-        <p>Sistema de Monitoreo Industrial con Análisis de Salud de Aislación y Diagnóstico de Motores por Inteligencia de Ciclo.</p>
+        <div class="evolution">Firmware Evolution v6.3.0</div>
+        <p>Sistema de Monitoreo Industrial con Suite de Diagnóstico Predictivo, Análisis de Red y Salud Mecánica de Compresores.</p>
         
         <div class="bottom-badges">
-            <div class="b-badge b-blue">MODO OSCURO PREMIUM</div>
+            <div class="b-badge b-blue">INDUSTRIAL DIAGNOSTICS</div>
             <div class="b-badge b-green">HEALTH SCORE ENGINE</div>
-            <div class="b-badge b-orange">BINARY BACKUP SYSTEM</div>
+            <div class="b-badge b-orange">PREDICTIVE MAINTENANCE</div>
         </div>
 
         <div class="scroll-text">DESLIZA PARA EL MEGA MANUAL COMPLETO</div>
@@ -342,50 +342,34 @@
 
         <!-- PARTE II: MANUAL TECNICO (INGENIERIA) -->
         <section id="tecnico">
-            <div class="part-badge">Parte II: Manual Técnico de Ingeniería (Para el Instalador)</div>
-            <h2>Arquitectura y Algoritmos</h2>
+            <div class="part-badge">Parte II: Suite de Diagnóstico Avanzado (v6.3)</div>
+            <h2>Ingeniería Predictiva</h2>
             
             <div class="card">
-                <h3>1. Procesamiento DSP y True RMS</h3>
-                <p>El Sentinel Pro no estima el consumo; lo procesa digitalmente. El sensor Hall ACS712 envía una señal analógica que el ESP32 digitaliza a alta velocidad.</p>
-                
+                <h3>1. Estimación de Caída de Tensión (Network Quality)</h3>
+                <p>El Sentinel v6.3 emplea un modelo matemático de carga constante. Al conocer el amperaje nominal (configurado en <code>Trigger Amps</code>), monitorea desviaciones en el consumo estable.</p>
+                <div class="example-box">
+                    <h5>⚙️ Lógica: I = V / R</h5>
+                    <p>Si la resistencia del bobinado (R) es constante, una caída en el Amperaje (I) indica directamente una caída en el Voltaje (V). El sistema reporta un porcentaje de calidad donde 100% es la tensión nominal.</p>
+                </div>
+
+                <h3>2. Análisis de Armónicos y Micro-vibraciones</h3>
+                <p>Utilizando la varianza estadística de las 2000 muestras tomadas, el sistema detecta "ruido" en la onda sinusoidal de corriente.</p>
                 <div class="graphic-container">
                     <div class="wave-graphic">
-                        <div class="wave-bar" style="animation-delay: 0.1s"></div>
-                        <div class="wave-bar" style="animation-delay: 0.2s"></div>
-                        <div class="wave-bar" style="animation-delay: 0.3s"></div>
-                        <div class="wave-bar" style="animation-delay: 0.4s"></div>
-                        <div class="wave-bar" style="animation-delay: 0.5s"></div>
-                        <div class="wave-bar" style="animation-delay: 0.6s"></div>
-                        <div class="wave-bar" style="animation-delay: 0.7s"></div>
-                        <div class="wave-bar" style="animation-delay: 0.8s"></div>
+                        <div class="wave-bar" style="animation-delay: 0.1s; background: #ef4444;"></div>
+                        <div class="wave-bar" style="animation-delay: 0.3s; background: #ef4444;"></div>
+                        <div class="wave-bar" style="animation-delay: 0.5s; background: #ef4444;"></div>
+                        <div class="wave-bar" style="animation-delay: 0.7s; background: #ef4444;"></div>
                     </div>
-                    <p style="margin-top: 20px; color: var(--secondary); font-weight: 700;">PROCESAMIENTO DE 2000 MUESTRAS POR CICLO</p>
+                    <p style="margin-top: 20px; color: #ef4444; font-weight: 700;">DETECCIÓN DE RUIDO MECÁNICO (VIBRACIÓN)</p>
                 </div>
 
-                <p><strong>¿Por qué es importante?</strong> Los motores generan ruidos y armónicos. Un protector común fallaría por lecturas falsas. El Sentinel integra la curva de corriente para obtener el valor RMS real.</p>
+                <h3>3. Algoritmo de Detección de Fuga de Gas</h3>
+                <p>Cruza el Amperaje RMS con la temperatura reportada por el Nodo Termostato. Una "Fuga de Gas" se caracteriza por un motor trabajando con **baja carga** (poco amperaje) pero con **baja eficiencia térmica** (la temperatura no baja del setpoint).</p>
 
-                <h3>2. Protección de Ciclos Cortos (Short Cycle)</h3>
-                <p>Este algoritmo previene que el motor intente arrancar repetidamente contra una presión de gas alta (lo cual quemaría el bobinado de arranque).</p>
-                
-                <div class="example-box">
-                    <h5>⚙️ Lógica de Bloqueo</h5>
-                    <p>Si <code>Tiempo_Marcha < 8 segundos</code>, el sistema marca un "Evento de Ciclo Corto". Al llegar a <strong>3 eventos seguidos</strong>, el SSR se abre permanentemente y requiere rearmado manual.</p>
-                </div>
-
-                <h3>3. Health Score Engine (Salud Térmica)</h3>
-                <p>Esta es la función más avanzada de la v6.2.7. Analiza la inercia térmica del sistema.</p>
-                <div class="graphic-container">
-                    <div style="height: 10px; width: 100%; background: #1e293b; border-radius: 10px; overflow: hidden; position: relative;">
-                        <div style="height: 100%; width: 85%; background: linear-gradient(to right, var(--danger), var(--success));"></div>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; margin-top: 10px; font-size: 0.8rem;">
-                        <span>CRÍTICO</span>
-                        <span>NORMAL</span>
-                        <span>ÓPTIMO (85%)</span>
-                    </div>
-                </div>
-                <p>El sistema mide el tiempo de descanso promedio. Si detecta que los descansos se acortan más de un 40% sin que suba la temperatura ambiente, asume que hay una falla en la aislación o burletes.</p>
+                <h3>4. Monitor de Desgaste (Wear Index)</h3>
+                <p>Calcula el estrés acumulado basado en el tipo de arranque. Un arranque normal suma 1 punto, pero un arranque con alta fricción o bajo voltaje puede sumar hasta 50 puntos de estrés en la memoria del equipo.</p>
             </div>
         </section>
 
@@ -445,8 +429,8 @@
 
     <!-- PIE DE PAGINA -->
     <footer>
-        <div class="f-main">Sentinel Pro Ecosystem | Diseñado por Byte-ELECTRONICLAB</div>
-        <div class="f-secondary">Documentación v6.2.7 - Generada en Abril de 2026</div>
+        <div class="f-main">Sentinel Pro Industrial Ecosystem | Diseñado por Byte-ELECTRONICLAB</div>
+        <div class="f-secondary">Documentación v6.3.0 - Generada en Abril de 2026</div>
         <div class="f-bottom">INGENIERÍA ARGENTINA | DESARROLLO DE ALTA PERFORMANCE</div>
     </footer>
 
