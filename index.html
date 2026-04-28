@@ -279,149 +279,181 @@
 
     <div class="main-content">
 
+        <!-- INTRODUCCIÓN AMIGABLE -->
+        <section id="bienvenida">
+            <div class="part-badge">¡Bienvenido al Futuro del Frío!</div>
+            <h2>Tu Sentinel Pro v6.3.0</h2>
+            <div class="card">
+                <p>Imagina que el <strong>Sentinel Pro</strong> es un "Médico de Cabecera" y un "Guardaespaldas" personal para tu heladera o compresor industrial. No necesitas ser ingeniero para usarlo: él hace el trabajo difícil por ti, vigilando la electricidad y la mecánica las 24 horas del día.</p>
+                <p>En esta versión <strong>6.3.0</strong>, hemos añadido inteligencia artificial básica para que el equipo pueda "sentir" si el motor está cansado, si la red eléctrica tiene poca fuerza o si se está escapando el gas refrigerante.</p>
+            </div>
+        </section>
+
+        <!-- EL BOTÓN MÁGICO -->
+        <section id="reset-auditoria">
+            <div class="part-badge" style="background: linear-gradient(135deg, #f59e0b, #ef4444);">Nuevo en v6.3: Reset de Auditoría</div>
+            <h2>El Botón para el Técnico Viajero 🔄</h2>
+            <div class="card">
+                <h3>¿Para qué sirve el botón "Reset Auditoría"?</h3>
+                <p>Si eres un técnico que usa el Sentinel para revisar diferentes heladeras en un mismo día, este botón es tu mejor aliado. Permite dejar el equipo "en blanco" para un nuevo cliente sin borrar tu configuración personal.</p>
+                
+                <div class="example-box">
+                    <h5>Ejemplo de la Vida Real:</h5>
+                    <p><strong>Escenario A (Mañana):</strong> Revisas la heladera de una Carnicería. El Sentinel te marca que el motor está al 40% de desgaste y ya arrancó 20 veces.</p>
+                    <p><strong>Escenario B (Tarde):</strong> Vas a un Supermercado a revisar otra heladera.</p>
+                    <p><strong>Acción:</strong> Presionas <strong>"Reset Auditoría"</strong>. El Sentinel olvida los datos de la carnicería y empieza de cero (0 ciclos, 0% desgaste) para que el nuevo informe sea preciso. <strong>¡Ojo!</strong> No borra tu clave de WiFi ni la calibración del sensor; eso queda siempre guardado.</p>
+                </div>
+            </div>
+        </section>
+
         <!-- PARTE I: MANUAL DE USUARIO (USO DIARIO) -->
         <section id="usuario">
-            <div class="part-badge">Parte I: Manual de Uso Diario (Para el Propietario)</div>
-            <h2>Dominando tu Sentinel Pro</h2>
+            <div class="part-badge">Parte I: Manual de Uso Diario (Para todos)</div>
+            <h2>Entendiendo a tu Centinela</h2>
             
             <div class="card">
-                <h3>1. Primer Contacto: ¿Qué veo en mi aparato?</h3>
-                <p>El Sentinel Pro tiene una pantalla de cristal líquido que te informa el estado de tu equipo las 24 horas. Aquí no hay códigos raros, solo información útil:</p>
+                <h3>1. ¿Cómo leer la pantalla? (El Diccionario Sencillo)</h3>
+                <p>La pantalla te habla de forma simple. Aquí tienes qué significa cada valor en la vida real:</p>
                 
                 <div class="t-wrap">
                     <table>
                         <thead>
                             <tr>
-                                <th>Mensaje</th>
-                                <th>Significado Real</th>
-                                <th>Ejemplo</th>
+                                <th>Lo que ves</th>
+                                <th>Nombre Técnico</th>
+                                <th>Explicación para Humanos</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr>
-                                <td><strong>0.0 A</strong></td>
-                                <td>El motor está apagado y descansando.</td>
-                                <td>La heladera llegó a la temperatura deseada.</td>
+                                <td><strong>A: 2.10</strong></td>
+                                <td>Amperaje</td>
+                                <td>Es el <strong>"Pulso"</strong>. Cuánta energía está consumiendo el motor ahora mismo.</td>
                             </tr>
                             <tr>
-                                <td><strong>1.5 A (Variable)</strong></td>
-                                <td>El motor está encendido y enfriando.</td>
-                                <td>Consumo normal de un motor de 1/4 HP.</td>
+                                <td><strong>C: 15</strong></td>
+                                <td>Ciclos</td>
+                                <td>Cuántas veces <strong>arrancó</strong> el motor. Si sube mucho, la heladera no está parando.</td>
                             </tr>
                             <tr>
-                                <td><strong>TOTAL: 24</strong></td>
-                                <td>Cuántas veces arrancó en el día.</td>
-                                <td>Si este número sube muy rápido, revisa los burletes.</td>
+                                <td><strong>P: 8.5</strong></td>
+                                <td>Pico (Inrush)</td>
+                                <td>La <strong>"Fuerza Inicial"</strong>. Es el empujón más fuerte que da el motor al arrancar.</td>
+                            </tr>
+                            <tr>
+                                <td><strong>I: 1.81</strong></td>
+                                <td>Identidad (IP)</td>
+                                <td>Es el "DNI" del equipo en tu red WiFi. Úsalo para entrar desde el celular.</td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
 
-                <div class="example-box">
-                    <h5>💡 Ejemplo Práctico de Ahorro</h5>
-                    <p>Si notas que tu Sentinel marca <strong>TOTAL: 80</strong> en un solo día, tu heladera está arrancando demasiado seguido. Esto suele ser porque la puerta no cierra bien o le falta gas. El Sentinel te está avisando que estás gastando luz de más.</p>
-                </div>
+                <h3>2. Salud de Aislación: ¿Mi heladera pierde frío?</h3>
+                <p>El Sentinel calcula un porcentaje de <strong>Salud (%)</strong> basado en cuánto tiempo descansa el motor entre arranques.</p>
+                <ul>
+                    <li><strong>90% - 100% (Excelente):</strong> La heladera está perfecta. Los burletes (gomas) cierran bien y tiene gas completo.</li>
+                    <li><strong>60% - 80% (Normal):</strong> Funcionamiento estándar, puede haber pequeñas pérdidas de frío.</li>
+                    <li><strong>Menos de 50% (¡Alerta!):</strong> Algo anda mal. O dejas la puerta abierta, o las gomas están rotas, o le falta un poco de gas. El motor está trabajando de más.</li>
+                </ul>
+            </div>
 
-                <h3>2. Las Alarmas: ¿Qué hacer si suena?</h3>
-                <p>Tu Sentinel es un guardaespaldas. Si suena, es porque salvó al motor de morir. </p>
-                <div class="graphic-container">
-                    <div style="font-size: 3rem; margin-bottom: 20px;">🔔</div>
-                    <div style="color: var(--danger); font-weight: 800; font-size: 1.5rem;">PITIDO LARGO = ACCIÓN REQUERIDA</div>
-                    <p style="margin-top: 20px;">El equipo cortó la luz para que el motor no se prenda fuego.</p>
+            <div class="card">
+                <h3>3. Guía de Sonidos: ¿Por qué pita mi Sentinel? 🔔</h3>
+                <p>El equipo usa sonidos para avisarte qué está pasando sin que tengas que mirar la pantalla:</p>
+                <div class="t-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Sonido</th>
+                                <th>Significado</th>
+                                <th>Qué debes hacer</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>Bip corto y doble</strong></td>
+                                <td>Encendido OK</td>
+                                <td>Nada, el equipo acaba de prenderse y está listo.</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Pitido largo constante</strong></td>
+                                <td><strong>¡PELIGRO!</strong></td>
+                                <td>El motor se trabó (Stall). El Sentinel ya cortó la luz para salvarlo. Llama al técnico.</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Bips rápidos repetidos</strong></td>
+                                <td>Alerta de Calor</td>
+                                <td>La temperatura subió demasiado. Revisa si alguien dejó la heladera abierta.</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Tres bips y pausa</strong></td>
+                                <td>WiFi Perdido</td>
+                                <td>El equipo no encuentra internet. Revisa tu router.</td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
-
-                <p><strong>Pasos para Rearmar:</strong></p>
-                <ol>
-                    <li>Entra al panel web desde tu teléfono.</li>
-                    <li>Verás un botón <strong>ROJO</strong> gigante que dice "REARMAR".</li>
-                    <li>Presiónalo. El motor intentará arrancar de nuevo.</li>
-                    <li><strong>IMPORTANTE:</strong> Si el motor intenta arrancar y el Sentinel lo vuelve a cortar a los 2 segundos, <strong>NO lo rearmes más</strong>. Llama a un técnico porque el motor está trabado eléctricamente.</li>
-                </ol>
             </div>
         </section>
 
         <!-- PARTE II: MANUAL TECNICO (INGENIERIA) -->
         <section id="tecnico">
-            <div class="part-badge">Parte II: Suite de Diagnóstico Avanzado (v6.3)</div>
-            <h2>Ingeniería Predictiva</h2>
+            <div class="part-badge">Parte II: Suite de Diagnóstico Avanzado (Ingeniería)</div>
+            <h2>Ingeniería Industrial Simplificada</h2>
             
             <div class="card">
-                <h3>1. Estimación de Caída de Tensión (Network Quality)</h3>
-                <p>El Sentinel v6.3 emplea un modelo matemático de carga constante. Al conocer el amperaje nominal (configurado en <code>Trigger Amps</code>), monitorea desviaciones en el consumo estable.</p>
-                <div class="example-box">
-                    <h5>⚙️ Lógica: I = V / R</h5>
-                    <p>Si la resistencia del bobinado (R) es constante, una caída en el Amperaje (I) indica directamente una caída en el Voltaje (V). El sistema reporta un porcentaje de calidad donde 100% es la tensión nominal.</p>
+                <p>La <strong>Suite v6.3</strong> activa 5 sensores inteligentes que analizan la "salud oculta" del compresor. Aquí te explicamos qué hace cada uno:</p>
+
+                <div class="example-box" style="border-color: var(--primary);">
+                    <h5 style="color: var(--primary);">1. Calidad de Red (Caída V)</h5>
+                    <p>Mide si la electricidad de la calle tiene la "fuerza" suficiente. Si la red cae, el amperaje cambia de forma sospechosa y el Sentinel te avisa antes de que el motor sufra por baja tensión.</p>
                 </div>
 
-                <h3>2. Análisis de Armónicos y Micro-vibraciones</h3>
-                <p>Utilizando la varianza estadística de las 2000 muestras tomadas, el sistema detecta "ruido" en la onda sinusoidal de corriente.</p>
-                <div class="graphic-container">
-                    <div class="wave-graphic">
-                        <div class="wave-bar" style="animation-delay: 0.1s; background: #ef4444;"></div>
-                        <div class="wave-bar" style="animation-delay: 0.3s; background: #ef4444;"></div>
-                        <div class="wave-bar" style="animation-delay: 0.5s; background: #ef4444;"></div>
-                        <div class="wave-bar" style="animation-delay: 0.7s; background: #ef4444;"></div>
-                    </div>
-                    <p style="margin-top: 20px; color: #ef4444; font-weight: 700;">DETECCIÓN DE RUIDO MECÁNICO (VIBRACIÓN)</p>
+                <div class="example-box" style="border-color: var(--secondary);">
+                    <h5 style="color: var(--secondary);">2. Huella de Arranque (Fingerprint)</h5>
+                    <p>Cada motor tiene una "firma" al arrancar. Si el arranque es muy lento o muy violento comparado con el primer día, el Sentinel detecta que el capacitor o el bobinado se están agotando.</p>
                 </div>
 
-                <h3>3. Algoritmo de Detección de Fuga de Gas</h3>
-                <p>Cruza el Amperaje RMS con la temperatura reportada por el Nodo Termostato. Una "Fuga de Gas" se caracteriza por un motor trabajando con **baja carga** (poco amperaje) pero con **baja eficiencia térmica** (la temperatura no baja del setpoint).</p>
+                <div class="example-box" style="border-color: var(--accent);">
+                    <h5 style="color: var(--accent);">3. Monitor de Desgaste (Wear Index)</h5>
+                    <p>Este es un contador de "estrés". Cada vez que el motor arranca con calor, con baja tensión o sufre un corte repentino, el <strong>Wear Index</strong> sube. Cuando llega a 80%, es hora de ir pensando en cambiar el motor.</p>
+                </div>
 
-                <h3>4. Monitor de Desgaste (Wear Index)</h3>
-                <p>Calcula el estrés acumulado basado en el tipo de arranque. Un arranque normal suma 1 punto, pero un arranque con alta fricción o bajo voltaje puede sumar hasta 50 puntos de estrés en la memoria del equipo.</p>
+                <div class="example-box" style="border-color: var(--danger);">
+                    <h5 style="color: var(--danger);">4. Estimador de Fuga de Gas</h5>
+                    <p>El Sentinel cruza datos: si el motor consume poca energía (está liviano) pero la heladera no enfría, concluye que el gas se ha escapado. ¡Te avisa antes de que se eche a perder la mercadería!</p>
+                </div>
             </div>
         </section>
 
-        <!-- CONFIGURACIÓN MAESTRA -->
-        <section id="config">
-            <h2>3. Configuración y Parámetros</h2>
+        <!-- CONFIGURACIÓN Y GUARDADO -->
+        <section id="config-nota">
+            <div class="part-badge" style="background: var(--success); color: white;">Nota Técnica: Persistencia de Datos</div>
+            <h2>¿Cómo guardar los cambios correctamente? 💾</h2>
             <div class="card">
-                <p>El panel de configuración permite tunear el equipo para cualquier motor (desde una heladera familiar hasta un chiller industrial).</p>
-                
-                <div class="t-wrap">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Parámetro</th>
-                                <th>Uso Técnico</th>
-                                <th>Valor Recomendado</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td><strong>Zero Amps</strong></td>
-                                <td>Calibración del sensor sin carga.</td>
-                                <td>2048 - 2500 (Auto)</td>
-                            </tr>
-                            <tr>
-                                <td><strong>Trigger Amps</strong></td>
-                                <td>Amperaje máximo antes de disparar alarma.</td>
-                                <td>1.5x Amperaje Nominal</td>
-                            </tr>
-                            <tr>
-                                <td><strong>Min Watts (minwa)</strong></td>
-                                <td>Detecta motor girando en vacío (fuga de gas).</td>
-                                <td>0.3A para heladeras</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+                <p>A diferencia de versiones anteriores, el Sentinel Pro v6.3 tiene <strong>Memoria Permanente Mejorada</strong>.</p>
+                <p><strong>IMPORTANTE:</strong> Cuando actives cualquiera de las opciones de diagnóstico (Suite V6.3), debes presionar el botón <strong>"GUARDAR Y REINICIAR"</strong>. Al hacerlo:</p>
+                <ol>
+                    <li>El Sentinel escribe tus preferencias en su memoria interna (Flash).</li>
+                    <li>Se reinicia automáticamente.</li>
+                    <li>Al volver a prender, verás que tus opciones siguen marcadas. **Si no presionas ese botón, los cambios se perderán al apagar el equipo.**</li>
+                </ol>
             </div>
         </section>
 
         <!-- SOPORTE Y FALLAS -->
         <section id="soporte">
-            <h2>4. Resolución de Problemas (FAQ)</h2>
+            <h2>Resolución de Dudas Frecuentes (FAQ)</h2>
             <div class="card">
-                <p><strong>P: La pantalla muestra letras chinas o símbolos raros.</strong></p>
-                <p>R: Es interferencia eléctrica (EMI). El Sentinel tiene un sistema de <strong>Self-Healing</strong> que repara la pantalla automáticamente cada 2 minutos. No afecta la protección.</p>
+                <p><strong>P: ¿Qué es el "Número Fantasma" que sale a la derecha?</strong></p>
+                <p>R: Es el pico de arranque (P). Ahora viene con la letra **P** adelante para que sepas que es la fuerza máxima que hizo el motor al prenderse.</p>
                 
-                <p><strong>P: El WiFi no conecta.</strong></p>
-                <p>R: Si el router está muy lejos, el equipo activa el <strong>Modo AP</strong> (Punto de Acceso). Conéctate a la red "Sentinel_Pro" para configurar el WiFi de nuevo.</p>
+                <p><strong>P: El WiFi no me aparece en el celular.</strong></p>
+                <p>R: El Sentinel solo crea su propia red (llamada <i>Sentinel_Pro</i>) si no logra conectarse a tu WiFi de siempre. Si estás conectado a tu casa, no verás la red del Sentinel.</p>
 
-                <p><strong>P: ¿Cómo actualizo el firmware?</strong></p>
-                <p>R: Descarga primero tu backup desde la pestaña OTA. Luego sube el nuevo <code>.bin</code>. Si algo falla, puedes volver al backup en segundos.</p>
+                <p><strong>P: ¿Es normal que la pantalla se apague?</strong></p>
+                <p>R: Sí. El equipo tiene un sistema de ahorro y "auto-limpieza" de pantalla para evitar ruidos eléctricos. Se refresca sola cada 2 minutos.</p>
             </div>
         </section>
 
