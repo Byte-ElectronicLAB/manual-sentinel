@@ -3,468 +3,418 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sentinel Pro v6.3.0 | Mega Manual de Usuario e Ingeniería</title>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --primary: #3d8bfd;
-            --primary-glow: rgba(61, 139, 253, 0.4);
-            --secondary: #00ffcc;
-            --accent: #f59e0b;
-            --danger: #ef4444;
-            --success: #10b981;
-            --dark-bg: #050a18;
-            --card-bg: rgba(15, 23, 42, 0.8);
-            --text-main: #f8fafc;
-            --text-dim: #94a3b8;
-            --border: rgba(255, 255, 255, 0.1);
-        }
-
-        * {
-            box-sizing: border-box;
-            -webkit-font-smoothing: antialiased;
-            scroll-behavior: smooth;
-        }
-
-        body {
-            font-family: 'Outfit', sans-serif;
-            background-color: #050a18;
-            background-image: 
-                radial-gradient(circle at 10% 20%, rgba(0, 170, 255, 0.08) 0%, transparent 50%),
-                radial-gradient(circle at 90% 80%, rgba(0, 255, 204, 0.08) 0%, transparent 50%);
-            color: var(--text-main);
-            line-height: 1.8;
-            margin: 0;
-            padding: 0;
-            overflow-x: hidden;
-        }
-
-        /* --- HERO SECTION --- */
-        .hero {
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            text-align: center;
-            padding: 40px;
-            background: #050a18;
-            position: relative;
-        }
-
-        .top-badge {
-            border: 1px solid #3d8bfd;
-            color: #3d8bfd;
-            padding: 10px 40px;
-            border-radius: 100px;
-            font-size: 0.75rem;
-            font-weight: 700;
-            letter-spacing: 3px;
-            text-transform: uppercase;
-            margin-bottom: 50px;
-            background: rgba(61, 139, 253, 0.05);
-        }
-
-        .logo-box {
-            width: 140px;
-            height: 140px;
-            background: linear-gradient(135deg, #00d2ff, #3a7bd5);
-            border-radius: 40px;
-            margin-bottom: 60px;
-            box-shadow: 0 0 60px rgba(0, 210, 255, 0.4);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 4rem;
-            color: white;
-            font-weight: 800;
-        }
-
-        .hero h1 {
-            font-size: clamp(3.5rem, 12vw, 6rem);
-            font-weight: 800;
-            margin: 0;
-            letter-spacing: -3px;
-            color: #ffffff;
-            background: linear-gradient(to right, #fff 60%, #94a3b8);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        .hero .evolution {
-            font-size: 2.2rem;
-            color: #00ffcc;
-            font-family: 'JetBrains Mono', monospace;
-            margin-top: 15px;
-            font-weight: 700;
-        }
-
-        .hero p {
-            max-width: 800px;
-            color: var(--text-dim);
-            font-size: 1.15rem;
-            margin-top: 30px;
-        }
-
-        .bottom-badges {
-            display: flex;
-            gap: 15px;
-            margin-top: 60px;
-            flex-wrap: wrap;
-            justify-content: center;
-        }
-
-        .b-badge {
-            border: 1px solid;
-            padding: 10px 25px;
-            border-radius: 8px;
-            font-size: 0.72rem;
-            font-weight: 800;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        .b-blue { border-color: #3d8bfd; color: #3d8bfd; }
-        .b-green { border-color: #00ffcc; color: #00ffcc; }
-        .b-orange { border-color: #f59e0b; color: #f59e0b; }
-
-        .scroll-text {
-            position: absolute;
-            bottom: 40px;
-            font-size: 0.7rem;
-            color: var(--text-dim);
-            letter-spacing: 3px;
-            text-transform: uppercase;
-        }
-
-        /* --- CONTENT --- */
-        .main-content {
-            max-width: 1100px;
-            margin: 0 auto;
-            padding: 80px 24px;
-        }
-
-        section { margin-bottom: 120px; }
-
-        h2 {
-            font-size: clamp(2.5rem, 6vw, 4rem);
-            font-weight: 800;
-            margin-bottom: 60px;
-            letter-spacing: -2px;
-            border-left: 10px solid var(--primary);
-            padding-left: 30px;
-        }
-
-        h3 {
-            font-size: 2rem;
-            color: var(--primary);
-            margin-top: 80px;
-            margin-bottom: 30px;
-            display: flex;
-            align-items: center;
-            gap: 20px;
-        }
-
-        .part-badge {
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
-            color: black;
-            padding: 6px 15px;
-            border-radius: 8px;
-            font-size: 0.9rem;
-            font-weight: 800;
-            text-transform: uppercase;
-            margin-bottom: 20px;
-            display: inline-block;
-        }
-
-        .card {
-            background: var(--card-bg);
-            border: 1px solid var(--border);
-            border-radius: 32px;
-            padding: 60px;
-            margin-bottom: 50px;
-            backdrop-filter: blur(20px);
-            box-shadow: 0 40px 80px rgba(0,0,0,0.5);
-            position: relative;
-        }
-
-        .example-box {
-            background: rgba(16, 185, 129, 0.05);
-            border: 2px dashed var(--success);
-            padding: 30px;
-            border-radius: 20px;
-            margin: 30px 0;
-        }
-
-        .example-box h5 { color: var(--success); margin: 0 0 15px 0; font-size: 1.1rem; text-transform: uppercase; }
-
-        .graphic-container {
-            background: #020617;
-            border-radius: 24px;
-            padding: 40px;
-            margin: 40px 0;
-            text-align: center;
-            border: 1px solid var(--border);
-        }
-
-        /* --- CSS GRAPHICS --- */
-        .wave-graphic {
-            height: 100px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 5px;
-        }
-        .wave-bar {
-            width: 4px;
-            background: var(--primary);
-            border-radius: 10px;
-            animation: wave-anim 1.5s infinite ease-in-out;
-        }
-        @keyframes wave-anim { 0%, 100% { height: 20px; } 50% { height: 80px; } }
-
-        .timeline {
-            display: flex;
-            align-items: center;
-            margin: 40px 0;
-            position: relative;
-        }
-        .time-node {
-            width: 20px;
-            height: 20px;
-            background: var(--primary);
-            border-radius: 50%;
-            position: relative;
-        }
-        .time-line { flex: 1; height: 2px; background: var(--border); }
-        .node-label { position: absolute; top: 30px; left: -20px; font-size: 0.75rem; white-space: nowrap; color: var(--text-dim); }
-
-        /* --- FOOTER --- */
-        footer {
-            text-align: center;
-            padding: 120px 24px;
-            background: #050a18;
-            color: #ffffff;
-            border-top: 1px solid var(--border);
-        }
-
-        .f-main { font-size: 1.4rem; font-weight: 700; margin-bottom: 15px; }
-        .f-secondary { font-size: 1.2rem; margin-bottom: 25px; font-weight: 300; }
-        .f-bottom { font-size: 0.9rem; text-transform: uppercase; letter-spacing: 3px; opacity: 0.6; }
-
-        .t-wrap { overflow-x: auto; border-radius: 20px; border: 1px solid var(--border); margin: 30px 0; background: rgba(0,0,0,0.3); }
-        table { width: 100%; border-collapse: collapse; text-align: left; }
-        th { background: rgba(61, 139, 253, 0.15); color: var(--primary); padding: 25px; font-size: 0.85rem; text-transform: uppercase; }
-        td { padding: 25px; border-bottom: 1px solid var(--border); font-size: 1rem; }
-    </style>
+    <title>Sentinel Pro v6.4.x - Manual Oficial</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-    <!-- CABECERA -->
-    <section class="hero">
-        <div class="top-badge">BYTE-ELECTRONICLAB | DIVISIÓN INGENIERÍA</div>
-        <div class="logo-box">S</div>
-        <h1>SENTINEL PRO</h1>
-        <div class="evolution">Firmware Evolution v6.3.0</div>
-        <p>Sistema de Monitoreo Industrial con Suite de Diagnóstico Predictivo, Análisis de Red y Salud Mecánica de Compresores.</p>
+    <!-- Sidebar Navigation -->
+    <nav class="sidebar">
+        <h2>Sentinel Pro v6.4.x</h2>
+        <ul>
+            <li><strong>Parte I: Manual de Usuario</strong></li>
+            <li><a href="#cap1">1. Introducción y Descripción General</a></li>
+            <li><a href="#cap2">2. Encendido y Pantalla LCD</a></li>
+            <li><a href="#cap3">3. Panel Web (Dashboard)</a></li>
+            <li><a href="#cap4">4. Alertas Sonoras y Buzzer</a></li>
+            <li><a href="#cap5">5. Botón Físico de Reset</a></li>
+            <li><a href="#cap6">6. Modos de Conexión y Configuración</a></li>
+            
+            <li style="margin-top: 1rem;"><strong>Parte II: Guía Técnica</strong></li>
+            <li><a href="#cap8">8. Lista de Componentes</a></li>
+            <li><a href="#cap9">9. Pinout y Conexiones</a></li>
+            <li><a href="#cap10">10. Lógica Interna y Trucos</a></li>
+            <li><a href="#cap10" style="padding-left:1.5rem; font-size:0.85rem;">↳ 10.9 Curva de Consumo (NUEVO)</a></li>
+            <li><a href="#cap12">12. Ecosistema Termostato Dual</a></li>
+            <li><a href="#cap13">13. Compilación y Puesta en Marcha</a></li>
+            <li><a href="#glosario">14. Glosario Técnico</a></li>
+        </ul>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="content">
         
-        <div class="bottom-badges">
-            <div class="b-badge b-blue">INDUSTRIAL DIAGNOSTICS</div>
-            <div class="b-badge b-green">HEALTH SCORE ENGINE</div>
-            <div class="b-badge b-orange">PREDICTIVE MAINTENANCE</div>
+        <div class="hero">
+            <h1>SENTINEL PRO</h1>
+            <div class="subtitle">v6.4.x Edición Integrada</div>
+            <p style="margin-top: 1rem; font-size: 1.2rem; color: var(--secondary);">Monitor de Carga Inteligente con Protección de Grado Profesional</p>
         </div>
 
-        <div class="scroll-text">DESLIZA PARA EL MEGA MANUAL COMPLETO</div>
-    </section>
+        <div class="alert alert-info">
+            <h4>ℹ️ Sobre este manual</h4>
+            <p>Este documento interactivo refleja el estado del firmware para la serie <strong>v6.4.x</strong>. Protege compresores de heladeras, aires acondicionados y bombas contra las fallas más comunes que los destruyen prematuramente.</p>
+        </div>
 
-    <div class="main-content">
-
-        <!-- INTRODUCCIÓN AMIGABLE -->
-        <section id="bienvenida">
-            <div class="part-badge">¡Bienvenido al Futuro del Frío!</div>
-            <h2>Tu Sentinel Pro v6.3.0</h2>
-            <div class="card">
-                <p>Imagina que el <strong>Sentinel Pro</strong> es un "Médico de Cabecera" y un "Guardaespaldas" personal para tu heladera o compresor industrial. No necesitas ser ingeniero para usarlo: él hace el trabajo difícil por ti, vigilando la electricidad y la mecánica las 24 horas del día.</p>
-                <p>En esta versión <strong>6.3.0</strong>, hemos añadido inteligencia artificial básica para que el equipo pueda "sentir" si el motor está cansado, si la red eléctrica tiene poca fuerza o si se está escapando el gas refrigerante.</p>
-            </div>
-        </section>
-
-        <!-- EL BOTÓN MÁGICO -->
-        <section id="reset-auditoria">
-            <div class="part-badge" style="background: linear-gradient(135deg, #f59e0b, #ef4444);">Nuevo en v6.3: Reset de Auditoría</div>
-            <h2>El Botón para el Técnico Viajero 🔄</h2>
-            <div class="card">
-                <h3>¿Para qué sirve el botón "Reset Auditoría"?</h3>
-                <p>Si eres un técnico que usa el Sentinel para revisar diferentes heladeras en un mismo día, este botón es tu mejor aliado. Permite dejar el equipo "en blanco" para un nuevo cliente sin borrar tu configuración personal.</p>
-                
-                <div class="example-box">
-                    <h5>Ejemplo de la Vida Real:</h5>
-                    <p><strong>Escenario A (Mañana):</strong> Revisas la heladera de una Carnicería. El Sentinel te marca que el motor está al 40% de desgaste y ya arrancó 20 veces.</p>
-                    <p><strong>Escenario B (Tarde):</strong> Vas a un Supermercado a revisar otra heladera.</p>
-                    <p><strong>Acción:</strong> Presionas <strong>"Reset Auditoría"</strong>. El Sentinel olvida los datos de la carnicería y empieza de cero (0 ciclos, 0% desgaste) para que el nuevo informe sea preciso. <strong>¡Ojo!</strong> No borra tu clave de WiFi ni la calibración del sensor; eso queda siempre guardado.</p>
-                </div>
-            </div>
-        </section>
-
-        <!-- PARTE I: MANUAL DE USUARIO (USO DIARIO) -->
-        <section id="usuario">
-            <div class="part-badge">Parte I: Manual de Uso Diario (Para todos)</div>
-            <h2>Entendiendo a tu Centinela</h2>
+        <!-- Capítulo 1 -->
+        <section id="cap1">
+            <h2>1. Introducción y Descripción General</h2>
+            <p>El Sentinel Pro es un sistema de protección y monitoreo inteligente para motores eléctricos.</p>
             
-            <div class="card">
-                <h3>1. ¿Cómo leer la pantalla? (El Diccionario Sencillo)</h3>
-                <p>La pantalla te habla de forma simple. Aquí tienes qué significa cada valor en la vida real:</p>
-                
-                <div class="t-wrap">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Lo que ves</th>
-                                <th>Nombre Técnico</th>
-                                <th>Explicación para Humanos</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td><strong>A: 2.10</strong></td>
-                                <td>Amperaje</td>
-                                <td>Es el <strong>"Pulso"</strong>. Cuánta energía está consumiendo el motor ahora mismo.</td>
-                            </tr>
-                            <tr>
-                                <td><strong>C: 15</strong></td>
-                                <td>Ciclos</td>
-                                <td>Cuántas veces <strong>arrancó</strong> el motor. Si sube mucho, la heladera no está parando.</td>
-                            </tr>
-                            <tr>
-                                <td><strong>P: 8.5</strong></td>
-                                <td>Pico (Inrush)</td>
-                                <td>La <strong>"Fuerza Inicial"</strong>. Es el empujón más fuerte que da el motor al arrancar.</td>
-                            </tr>
-                            <tr>
-                                <td><strong>I: 1.81</strong></td>
-                                <td>Identidad (IP)</td>
-                                <td>Es el "DNI" del equipo en tu red WiFi. Úsalo para entrar desde el celular.</td>
-                            </tr>
-                        </tbody>
-                    </table>
+            <div class="grid">
+                <div class="card">
+                    <h4>MEDICIÓN RMS REAL</h4>
+                    <p>No picos, no promedios. Valor cuadrático medio verdadero con 2000 muestras/150ms.</p>
                 </div>
-
-                <h3>2. Salud de Aislación: ¿Mi heladera pierde frío?</h3>
-                <p>El Sentinel calcula un porcentaje de <strong>Salud (%)</strong> basado en cuánto tiempo descansa el motor entre arranques.</p>
-                <ul>
-                    <li><strong>90% - 100% (Excelente):</strong> La heladera está perfecta. Los burletes (gomas) cierran bien y tiene gas completo.</li>
-                    <li><strong>60% - 80% (Normal):</strong> Funcionamiento estándar, puede haber pequeñas pérdidas de frío.</li>
-                    <li><strong>Menos de 50% (¡Alerta!):</strong> Algo anda mal. O dejas la puerta abierta, o las gomas están rotas, o le falta un poco de gas. El motor está trabajando de más.</li>
-                </ul>
+                <div class="card">
+                    <h4>CORTE INTELIGENTE</h4>
+                    <p>SSR de estado sólido sin partes mecánicas. Corte en microsegundos ante fallas detectadas.</p>
+                </div>
+                <div class="card">
+                    <h4>CONECTIVIDAD TOTAL</h4>
+                    <p>WiFi, OTA, Google Sheets, NTP y comunicación nativa con el Termostato Dual.</p>
+                </div>
             </div>
 
-            <div class="card">
-                <h3>3. Guía de Sonidos: ¿Por qué pita mi Sentinel? 🔔</h3>
-                <p>El equipo usa sonidos para avisarte qué está pasando sin que tengas que mirar la pantalla:</p>
-                <div class="t-wrap">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Sonido</th>
-                                <th>Significado</th>
-                                <th>Qué debes hacer</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td><strong>Bip corto y doble</strong></td>
-                                <td>Encendido OK</td>
-                                <td>Nada, el equipo acaba de prenderse y está listo.</td>
-                            </tr>
-                            <tr>
-                                <td><strong>Pitido largo constante</strong></td>
-                                <td><strong>¡PELIGRO!</strong></td>
-                                <td>El motor se trabó (Stall). El Sentinel ya cortó la luz para salvarlo. Llama al técnico.</td>
-                            </tr>
-                            <tr>
-                                <td><strong>Bips rápidos repetidos</strong></td>
-                                <td>Alerta de Calor</td>
-                                <td>La temperatura subió demasiado. Revisa si alguien dejó la heladera abierta.</td>
-                            </tr>
-                            <tr>
-                                <td><strong>Tres bips y pausa</strong></td>
-                                <td>WiFi Perdido</td>
-                                <td>El equipo no encuentra internet. Revisa tu router.</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+            <h3>¿Qué problemas soluciona?</h3>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Falla</th>
+                            <th>Causa Típica</th>
+                            <th>Acción del Sentinel</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Motor clavado (Stall)</strong></td>
+                            <td>Rotor trabado, capacitor de arranque abierto</td>
+                            <td>Corta SSR + alerta sonora + log en la nube</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Ciclos cortos (Rateada)</strong></td>
+                            <td>Protector térmico actuando, bajo voltaje</td>
+                            <td>Cuenta 3 ciclos cortos seguidos -> Bloqueo</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Falla de gas / Vacío</strong></td>
+                            <td>Fuga de refrigerante, filtro tapado</td>
+                            <td>Detecta consumo anómalo (muy bajo) -> Corte</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Sobrecorriente</strong></td>
+                            <td>Cortocircuito, cable dañado</td>
+                            <td>Alerta inmediata + registro en nube</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Temperatura crítica</strong></td>
+                            <td>Sobrecalentamiento del sistema</td>
+                            <td>Interlock con Termostato Dual</td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </section>
 
-        <!-- PARTE II: MANUAL TECNICO (INGENIERIA) -->
-        <section id="tecnico">
-            <div class="part-badge">Parte II: Suite de Diagnóstico Avanzado (Ingeniería)</div>
-            <h2>Ingeniería Industrial Simplificada</h2>
+        <!-- Capítulo 2 -->
+        <section id="cap2">
+            <h2>2. Encendido, Pantalla LCD y Primeros Pasos</h2>
             
-            <div class="card">
-                <p>La <strong>Suite v6.3</strong> activa 5 sensores inteligentes que analizan la "salud oculta" del compresor. Aquí te explicamos qué hace cada uno:</p>
+            <h3>Secuencia de Arranque</h3>
+            <p>Al conectar la alimentación, el LCD muestra el siguiente mensaje durante la auto-calibración (2 segundos):</p>
+            
+            <div class="lcd-display">
+                <div>SENTINEL PRO 6.4.x</div>
+                <div>Calibrando...     </div>
+            </div>
 
-                <div class="example-box" style="border-color: var(--primary);">
-                    <h5 style="color: var(--primary);">1. Calidad de Red (Caída V)</h5>
-                    <p>Mide si la electricidad de la calle tiene la "fuerza" suficiente. Si la red cae, el amperaje cambia de forma sospechosa y el Sentinel te avisa antes de que el motor sufra por baja tensión.</p>
+            <div class="alert alert-warning">
+                <h4>⚠️ Auto-Zero Automático</h4>
+                <p>El sistema mide 2000 veces el sensor sin carga para calcular el punto de cero exacto. Asegurate de que el motor esté apagado en este momento para máxima precisión.</p>
+            </div>
+
+            <h3>Pantalla en Operación Normal</h3>
+            <div class="lcd-display">
+                <div>A: 2.35       ON</div>
+                <div>C:127 I:1.80 3.8</div>
+            </div>
+
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Zona</th>
+                            <th>Contenido</th>
+                            <th>Ejemplo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>Línea 1 Izquierda</td><td>Amperaje RMS actual</td><td><code>A: 2.35</code></td></tr>
+                        <tr><td>Línea 1 Derecha</td><td>Estado del relé del motor</td><td><code>ON</code> o <code>OFF</code></td></tr>
+                        <tr><td>Línea 2 Col 0</td><td>Contador de ciclos exitosos</td><td><code>C:127</code></td></tr>
+                        <tr><td>Línea 2 Col 6</td><td>IP corta (I=Internet, A=AP)</td><td><code>I:1.80</code></td></tr>
+                        <tr><td>Línea 2 Col 13</td><td>Pico máximo último arranque</td><td><code>3.8</code></td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h3>Modo Protección Activa</h3>
+            <div class="lcd-display" style="color: #ef4444; border-color: #7f1d1d; text-shadow: 0 0 5px rgba(239, 68, 68, 0.5);">
+                <div>** PROTECCION **</div>
+                <div>  (parpadea)    </div>
+            </div>
+        </section>
+
+        <!-- Capítulo 3 -->
+        <section id="cap3">
+            <h2>3. Panel Web (Dashboard) Guía Completa</h2>
+            <p>Accedé desde cualquier browser escribiendo la IP del Sentinel (visible en el LCD). El panel se actualiza automáticamente cada 1.2 segundos.</p>
+
+            <h3>Colores del Panel de Diagnóstico</h3>
+            <div class="alert alert-success">
+                <h4>VERDE OK: Normal</h4>
+                <p>Todo funciona correctamente. Se muestra duración promedio y amperaje promedio de los últimos 8 ciclos.</p>
+            </div>
+            <div class="alert alert-warning">
+                <h4>AMARILLO Recopilando / Advertencia</h4>
+                <p>Acumulando datos (menos de 2 ciclos) o ciclos demasiado largos / consumo alto. Revisar gas o filtros.</p>
+            </div>
+            <div class="alert alert-danger">
+                <h4>ROJO ALERTA CRÍTICA</h4>
+                <p>Motor clavado, múltiples stalls o 3+ ciclos cortos. El equipo ya cortó la corriente. Rearmar solo después de inspeccionar.</p>
+            </div>
+
+            <div class="alert alert-info">
+                <h4>Truco: Botón REARMAR</h4>
+                <p>Solo aparece cuando hay una protección activa. Al hacer clic, el Sentinel habilita el SSR y emite 2 pitidos de confirmación. El rearme automático ocurre a los 5 minutos si nadie lo rearma manualmente.</p>
+            </div>
+        </section>
+
+        <!-- Capítulo 4 -->
+        <section id="cap4">
+            <h2>4. Sistema de Alertas y Sonidos del Buzzer</h2>
+            <p>El Sentinel comunica su estado con un buzzer activo. Aprender el código de sonidos permite diagnosticar el sistema sin abrir ningún panel web.</p>
+            
+            <div class="grid">
+                <div class="card">
+                    <h4>2 Pitidos Cortos <span class="badge badge-normal">NORMAL</span></h4>
+                    <p>Arranque exitoso del motor <strong>O</strong> Rearme manual exitoso desde la web. Todo OK.</p>
                 </div>
-
-                <div class="example-box" style="border-color: var(--secondary);">
-                    <h5 style="color: var(--secondary);">2. Huella de Arranque (Fingerprint)</h5>
-                    <p>Cada motor tiene una "firma" al arrancar. Si el arranque es muy lento o muy violento comparado con el primer día, el Sentinel detecta que el capacitor o el bobinado se están agotando.</p>
+                <div class="card">
+                    <h4>Pitido Largo <span class="badge badge-emergencia">EMERGENCIA</span></h4>
+                    <p>Motor clavado (stall), ciclos cortos o falla de gas. <strong>El SSR ya cortó la corriente.</strong> Inspeccionar.</p>
                 </div>
-
-                <div class="example-box" style="border-color: var(--accent);">
-                    <h5 style="color: var(--accent);">3. Monitor de Desgaste (Wear Index)</h5>
-                    <p>Este es un contador de "estrés". Cada vez que el motor arranca con calor, con baja tensión o sufre un corte repentino, el <strong>Wear Index</strong> sube. Cuando llega a 80%, es hora de ir pensando en cambiar el motor.</p>
+                <div class="card">
+                    <h4>3 Pitidos Desc. <span class="badge badge-advertencia">OFFLINE</span></h4>
+                    <p>WiFi desconectado. El Sentinel <strong>sigue protegiendo sin conexión</strong>. Se intentará reconectar.</p>
                 </div>
-
-                <div class="example-box" style="border-color: var(--danger);">
-                    <h5 style="color: var(--danger);">4. Estimador de Fuga de Gas</h5>
-                    <p>El Sentinel cruza datos: si el motor consume poca energía (está liviano) pero la heladera no enfría, concluye que el gas se ha escapado. ¡Te avisa antes de que se eche a perder la mercadería!</p>
+                <div class="card">
+                    <h4>2 Pitidos Medianos <span class="badge badge-advertencia">NODO</span></h4>
+                    <p>El Termostato Dual reportó una alerta activa de temperatura. Revisar interlock.</p>
                 </div>
             </div>
         </section>
 
-        <!-- CONFIGURACIÓN Y GUARDADO -->
-        <section id="config-nota">
-            <div class="part-badge" style="background: var(--success); color: white;">Nota Técnica: Persistencia de Datos</div>
-            <h2>¿Cómo guardar los cambios correctamente? 💾</h2>
-            <div class="card">
-                <p>A diferencia de versiones anteriores, el Sentinel Pro v6.3 tiene <strong>Memoria Permanente Mejorada</strong>.</p>
-                <p><strong>IMPORTANTE:</strong> Cuando actives cualquiera de las opciones de diagnóstico (Suite V6.3), debes presionar el botón <strong>"GUARDAR Y REINICIAR"</strong>. Al hacerlo:</p>
-                <ol>
-                    <li>El Sentinel escribe tus preferencias en su memoria interna (Flash).</li>
-                    <li>Se reinicia automáticamente.</li>
-                    <li>Al volver a prender, verás que tus opciones siguen marcadas. **Si no presionas ese botón, los cambios se perderán al apagar el equipo.**</li>
-                </ol>
+        <!-- Capítulo 5 -->
+        <section id="cap5">
+            <h2>5. Botón Físico de Reset (Triple Confirmación)</h2>
+            <p>El GPIO 13 acepta un pulsador externo (NA a GND) para resetear el contador de ciclos sin necesidad de la web. Un sistema de 3 pulsaciones evita borrados accidentales.</p>
+            
+            <div class="alert alert-warning">
+                <h4>Timeout de Seguridad (3 Segundos)</h4>
+                <p>Si dejás pasar más de 3 segundos entre pulsaciones, el proceso se cancela automáticamente y vuelve al monitoreo normal. No se borra nada.</p>
+            </div>
+
+            <ol style="margin-left: 2rem; margin-bottom: 2rem;">
+                <li style="margin-bottom: 1rem;">
+                    <strong>Primera pulsación (Inicio del proceso)</strong><br>
+                    LCD muestra: <code>Borrar contador? / [BOTON] 2 mas ...</code> (Suena 1 pitido corto)
+                </li>
+                <li style="margin-bottom: 1rem;">
+                    <strong>Segunda pulsación (Confirmación primaria)</strong><br>
+                    LCD muestra: <code>Seguro en serio? / [BOTON] 1 mas ...</code> (Suena 1 pitido corto)
+                </li>
+                <li style="margin-bottom: 1rem;">
+                    <strong>Tercera pulsación (Ejecución)</strong><br>
+                    Contador en 0. Suenan 2 pitidos de confirmación y el LCD vuelve al Dashboard normal.
+                </li>
+            </ol>
+        </section>
+
+        <!-- Capítulo 6 -->
+        <section id="cap6">
+            <h2>6. Modos de Conexión y Configuración Rápida</h2>
+            
+            <div class="grid">
+                <div class="card">
+                    <h4>Modo Internet (I:)</h4>
+                    <p>Conectado a tu red WiFi. Accedé al panel desde cualquier dispositivo en la misma red mediante la IP mostrada.</p>
+                </div>
+                <div class="card">
+                    <h4>Modo Access Point (A:)</h4>
+                    <p>Red de rescate propia. Conectate a la red <strong>Sentinel_Pro</strong> (pass: <code>12345678</code>) y entrá a <code>192.168.4.1</code>.</p>
+                </div>
             </div>
         </section>
 
-        <!-- SOPORTE Y FALLAS -->
-        <section id="soporte">
-            <h2>Resolución de Dudas Frecuentes (FAQ)</h2>
-            <div class="card">
-                <p><strong>P: ¿Qué es el "Número Fantasma" que sale a la derecha?</strong></p>
-                <p>R: Es el pico de arranque (P). Ahora viene con la letra **P** adelante para que sepas que es la fuerza máxima que hizo el motor al prenderse.</p>
-                
-                <p><strong>P: El WiFi no me aparece en el celular.</strong></p>
-                <p>R: El Sentinel solo crea su propia red (llamada <i>Sentinel_Pro</i>) si no logra conectarse a tu WiFi de siempre. Si estás conectado a tu casa, no verás la red del Sentinel.</p>
+        <!-- PARTE II -->
+        <div style="margin-top: 5rem; padding-top: 2rem; border-top: 3px dashed var(--border);">
+            <h2 style="border: none; color: var(--primary);">PARTE II: GUÍA TÉCNICA AVANZADA</h2>
+        </div>
 
-                <p><strong>P: ¿Es normal que la pantalla se apague?</strong></p>
-                <p>R: Sí. El equipo tiene un sistema de ahorro y "auto-limpieza" de pantalla para evitar ruidos eléctricos. Se refresca sola cada 2 minutos.</p>
+        <!-- Capítulo 8 -->
+        <section id="cap8">
+            <h2>8. Lista de Componentes y Materiales</h2>
+            
+            <div class="grid">
+                <div class="card"><strong>ESP32 Dev Module</strong><br>30 o 38 pines WiFi + BT</div>
+                <div class="card"><strong>Sensor ACS712</strong><br>5A / 20A / 30A Efecto Hall</div>
+                <div class="card"><strong>Relé SSR 25A</strong><br>SSR-25DA 3-32VDC / 24-380VAC</div>
+                <div class="card"><strong>LCD 16x2 I2C</strong><br>Dirección 0x27 (PCF8574)</div>
+                <div class="card"><strong>Buzzer Activo 5V</strong><br>Digital HIGH = suena</div>
+                <div class="card"><strong>Filtro RC</strong><br>R 1kΩ + C 100nF cerámico</div>
+            </div>
+
+            <div class="alert alert-danger" style="margin-top: 2rem;">
+                <h4>Elegir el sensor correcto es crítico</h4>
+                <p>Un sensor de 5A con un motor de 10A destruirá el sensor. Usar siempre un margen del 130-150% sobre la corriente nominal del motor.</p>
             </div>
         </section>
 
-    </div>
+        <!-- Capítulo 9 -->
+        <section id="cap9">
+            <h2>9. Pinout ESP32 y Diagrama de Conexiones</h2>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Pin GPIO</th>
+                            <th>Función</th>
+                            <th>Tipo</th>
+                            <th>Notas Importantes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><strong>GPIO 34</strong></td><td>Sensor ACS712</td><td>INPUT ADC</td><td>Solo lectura. Sin pullup. Requiere filtro RC.</td></tr>
+                        <tr><td><strong>GPIO 25</strong></td><td>Control Relé SSR</td><td>OUTPUT</td><td>HIGH = SSR habilitado (motor con corriente)</td></tr>
+                        <tr><td><strong>GPIO 26</strong></td><td>Buzzer activo</td><td>OUTPUT</td><td>HIGH = suena. LOW = silencio</td></tr>
+                        <tr><td><strong>GPIO 13</strong></td><td>Pulsador reset</td><td>INPUT_PULLUP</td><td>LOW al presionar. Activo en flanco de bajada.</td></tr>
+                        <tr><td><strong>GPIO 21</strong></td><td>LCD I2C SDA</td><td>I2C Data</td><td>Dirección LCD: 0x27. Bus a 50kHz (modo robusto)</td></tr>
+                        <tr><td><strong>GPIO 22</strong></td><td>LCD I2C SCL</td><td>I2C Clock</td><td>Velocidad reducida intencional para evitar glitches</td></tr>
+                    </tbody>
+                </table>
+            </div>
 
-    <!-- PIE DE PAGINA -->
-    <footer>
-        <div class="f-main">Sentinel Pro Industrial Ecosystem | Diseñado por Byte-ELECTRONICLAB</div>
-        <div class="f-secondary">Documentación v6.3.0 - Generada en Abril de 2026</div>
-        <div class="f-bottom">INGENIERÍA ARGENTINA | DESARROLLO DE ALTA PERFORMANCE</div>
-    </footer>
+            <div class="alert alert-info">
+                <h4>Filtro RC ¿Por qué es indispensable?</h4>
+                <p>El ACS712 genera ruido de alta frecuencia (HF) en su salida analógica. Sin un filtro (Resistencia 1kΩ en serie y Capacitor 100nF a GND), el ADC del ESP32 lee valores erróneos que disparan arranques fantasma.</p>
+            </div>
+        </section>
+
+        <!-- Capítulo 10 -->
+        <section id="cap10">
+            <h2>10. Lógica Interna y Los Trucos del Sistema</h2>
+            
+            <h3>10.1 Cálculo RMS Real (Root Mean Square)</h3>
+            <p>A diferencia de un simple voltímetro, el Sentinel toma <strong>2000 muestras en 150ms</strong>. Eso significa 5 ciclos completos de 50Hz para máxima precisión en corriente alterna.</p>
+
+<pre><code>// Pseudocódigo del cálculo RMS
+for(i = 0; i < 2000; i++) {
+    raw = analogRead(PIN_SENSOR);    // 0-4095 del ADC 12bit
+    delta = raw - cfg.zero;          // Sustrae el punto de cero (sin carga)
+    sumSq += delta * delta;          // Acumula cuadrados
+}
+rms = sqrt(sumSq / 2000);            // Raíz cuadrática media
+amperios = rms * cfg.sensibilidad;   // Convierte a Amperios</code></pre>
+
+            <h3>10.4 Detección de Motor Clavado (Stall)</h3>
+<pre><code>if (runSec > stallTimeSec && currentAmp > stallAmp) {
+    // Motor lleva más de 15s con más de 4A
+    // = rotor trabado mecánicamente
+    cortar_SSR();
+    enviar_a_nube("MOTOR_CLAVADO");
+    activar_buzzer_alarma();
+}</code></pre>
+
+            <h3>10.8 WDT Perro Guardián de Hardware (15 segundos)</h3>
+            <p>Si el procesador se traba en cualquier operación de red o flash por más de 15 segundos, el hardware reinicia el equipo automáticamente (<code>esp_task_wdt_reset()</code>).</p>
+
+            <h3>10.9 Curva de Consumo en Tiempo Real — Google Sheets <span class="badge badge-normal">NUEVO v6.4.7</span></h3>
+            <p>Esta feature permite visualizar el <strong>comportamiento exacto del amperaje durante todo el ciclo</strong>, no solo el valor máximo. Sirve para diagnosticar si una subida de consumo fue progresiva (desgaste o calentamiento) o abrupta (trabamiento o cortocircuito).</p>
+
+            <div class="alert alert-info">
+                <h4>📈 ¿Cómo funciona?</h4>
+                <p>El Sentinel almacena <strong>1 muestra de amperaje por minuto</strong> en RAM (hasta 120 muestras = 2 horas). Al terminar el ciclo, compacta esos datos como una cadena CSV (ej: <code>1.50,1.62,1.78,2.11,3.05</code>) y la envía en el mismo request a Google Sheets.</p>
+            </div>
+
+            <h3>Impacto en Recursos</h3>
+            <div class="table-container">
+                <table>
+                    <thead><tr><th>Recurso</th><th>Consumo</th><th>Observación</th></tr></thead>
+                    <tbody>
+                        <tr><td>RAM adicional</td><td><strong>480 bytes</strong></td><td>120 floats × 4 bytes. El ESP32 tiene ~200KB libres. Impacto: 0.24%.</td></tr>
+                        <tr><td>Flash (escrituras)</td><td><strong>0</strong></td><td>Solo RAM, sin desgaste de memoria NOR.</td></tr>
+                        <tr><td>Datos enviados</td><td>~480 chars CSV (ciclo de 2h)</td><td>Se envía una sola vez al finalizar el ciclo.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h3>Configuración en Google Sheets (SPARKLINE)</h3>
+            <p>Una vez que el script de Google Apps Script recibe el parámetro <code>curve</code>, debés escribir en la columna de tu planilla la siguiente fórmula para generar el gráfico automáticamente en la celda:</p>
+
+<pre><code>=SPARKLINE(
+  SPLIT(I2, ","),
+  {"charttype","line"; "color","#3b82f6"; "linewidth",2}
+)
+</code></pre>
+
+            <div class="alert alert-warning">
+                <h4>⚠️ Importante</h4>
+                <p>Reemplazá <code>I2</code> por la celda que contiene la cadena CSV enviada por el Sentinel (la columna donde el Apps Script guarda el parámetro <code>curve</code>). El <code>SPLIT(..., ",")</code> convierte el texto en números para el gráfico.</p>
+            </div>
+        </section>
+
+        <!-- Capítulo 12 -->
+        <section id="cap12">
+            <h2>12. Ecosistema Byte-ELECTRONICLAB (Termostato Dual)</h2>
+            <p>El Sentinel Pro v6.4.x se integra de forma nativa con el <strong>Termostato Dual DS18B20</strong>, formando un sistema de protección integral para el ciclo frigorífico completo.</p>
+
+            <div class="alert alert-danger">
+                <h4>Interlock por Temperatura Crítica (Seguridad Cruzada)</h4>
+                <p>Si el Termostato Dual reporta una temperatura superior a <code>maxTempSafety</code> (configurable, default 55°C), el Sentinel corta el SSR del compresor <strong>aunque el amperaje sea completamente normal</strong>. Esto protege el condensador o evaporador de un sobrecalentamiento destructivo.</p>
+            </div>
+        </section>
+
+        <!-- Capítulo 13 -->
+        <section id="cap13">
+            <h2>13. Compilación y Puesta en Marcha</h2>
+            
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr><th>Parámetro Arduino IDE</th><th>Valor Requerido</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>Board</td><td>ESP32 Dev Module</td></tr>
+                        <tr><td>Upload Speed</td><td>921600</td></tr>
+                        <tr><td>CPU Frequency</td><td>240MHz</td></tr>
+                        <tr><td>Partition Scheme</td><td>Default 4MB with spiffs</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <p>Librería externa requerida: <code>LiquidCrystal_I2C</code> (por Frank de Brabander).</p>
+        </section>
+
+        <!-- Glosario -->
+        <section id="glosario">
+            <h2>14. Glosario Técnico</h2>
+            <div class="grid">
+                <div class="card"><strong>RMS:</strong> Root Mean Square (valor eficaz real de una corriente alterna)</div>
+                <div class="card"><strong>Inrush:</strong> Corriente de arranque, típicamente 6-8x la corriente nominal</div>
+                <div class="card"><strong>Stall:</strong> Motor trabado mecánicamente (alto consumo sin movimiento)</div>
+                <div class="card"><strong>SSR:</strong> Solid State Relay (relé sin partes mecánicas, corte por triac)</div>
+                <div class="card"><strong>WDT:</strong> Watchdog Timer (reinicio de emergencia por hardware)</div>
+                <div class="card"><strong>Interlock:</strong> Bloqueo cruzado de seguridad (un sistema protege al otro)</div>
+            </div>
+        </section>
+
+        <footer style="margin-top: 4rem; text-align: center; color: var(--text-muted); border-top: 1px solid var(--border); padding-top: 2rem;">
+            <p><strong>Sentinel Pro v6.4.x</strong> - Byte-ELECTRONICLAB Edición Integrada</p>
+            <p style="font-size: 0.9rem;">Protección de grado profesional para sistemas de refrigeración. Documentación actualizada 2026.</p>
+        </footer>
+
+    </main>
 
 </body>
 </html>
