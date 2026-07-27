@@ -1,0 +1,332 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Fira+Code:wght@400;500&display=swap');
+
+:root {
+    --bg-main: #0b1120;
+    --bg-secondary: #111827;
+    --bg-card: #1f2937;
+    --bg-hover: #374151;
+    --text-main: #f3f4f6;
+    --text-muted: #9ca3af;
+    --primary: #3b82f6;
+    --primary-glow: rgba(59, 130, 246, 0.5);
+    --secondary: #60a5fa;
+    --success: #10b981;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --border: #374151;
+    --sidebar-width: 300px;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: var(--bg-main);
+    color: var(--text-main);
+    line-height: 1.6;
+    display: flex;
+    scroll-behavior: smooth;
+}
+
+/* Sidebar */
+.sidebar {
+    width: var(--sidebar-width);
+    background-color: var(--bg-secondary);
+    height: 100vh;
+    position: fixed;
+    top: 0;
+    left: 0;
+    overflow-y: auto;
+    border-right: 1px solid var(--border);
+    padding: 2rem 1rem;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) var(--bg-secondary);
+}
+
+.sidebar h2 {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--primary);
+    margin-bottom: 1.5rem;
+    padding-left: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.sidebar ul {
+    list-style: none;
+}
+
+.sidebar li {
+    margin-bottom: 0.5rem;
+}
+
+.sidebar a {
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 0.95rem;
+    display: block;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.sidebar a:hover {
+    background-color: var(--bg-hover);
+    color: var(--text-main);
+}
+
+/* Main Content */
+.content {
+    margin-left: var(--sidebar-width);
+    padding: 4rem;
+    max-width: 1000px;
+    width: 100%;
+}
+
+/* Typography */
+h1 {
+    font-size: 3rem;
+    font-weight: 800;
+    margin-bottom: 1rem;
+    background: linear-gradient(to right, #60a5fa, #3b82f6);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: -1px;
+}
+
+h2 {
+    font-size: 2rem;
+    font-weight: 700;
+    margin-top: 3rem;
+    margin-bottom: 1.5rem;
+    color: var(--text-main);
+    border-bottom: 2px solid var(--border);
+    padding-bottom: 0.5rem;
+}
+
+h3 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-top: 2rem;
+    margin-bottom: 1rem;
+    color: var(--secondary);
+}
+
+p {
+    margin-bottom: 1.5rem;
+    font-size: 1.05rem;
+    color: var(--text-muted);
+}
+
+strong {
+    color: var(--text-main);
+}
+
+/* Header Banner */
+.hero {
+    text-align: center;
+    padding: 4rem 2rem;
+    background: radial-gradient(circle at center, var(--bg-secondary) 0%, var(--bg-main) 100%);
+    border-radius: 20px;
+    margin-bottom: 4rem;
+    border: 1px solid var(--border);
+    box-shadow: 0 0 40px rgba(0, 0, 0, 0.5);
+}
+
+.hero h1 {
+    font-size: 4rem;
+    margin-bottom: 0.5rem;
+}
+
+.hero .subtitle {
+    font-size: 1.5rem;
+    color: var(--text-muted);
+    font-weight: 300;
+}
+
+/* Tables */
+.table-container {
+    overflow-x: auto;
+    margin-bottom: 2rem;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    background-color: var(--bg-card);
+}
+
+th, td {
+    padding: 1rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+}
+
+th {
+    background-color: var(--bg-hover);
+    font-weight: 600;
+    color: var(--text-main);
+}
+
+tr:last-child td {
+    border-bottom: none;
+}
+
+tr:hover {
+    background-color: rgba(55, 65, 81, 0.5);
+}
+
+/* Alerts / Callouts */
+.alert {
+    padding: 1.5rem;
+    border-radius: 12px;
+    margin-bottom: 2rem;
+    border-left: 4px solid;
+    background-color: var(--bg-card);
+}
+
+.alert-info {
+    border-color: var(--primary);
+    background-color: rgba(59, 130, 246, 0.1);
+}
+
+.alert-warning {
+    border-color: var(--warning);
+    background-color: rgba(245, 158, 11, 0.1);
+}
+
+.alert-danger {
+    border-color: var(--danger);
+    background-color: rgba(239, 68, 68, 0.1);
+}
+
+.alert-success {
+    border-color: var(--success);
+    background-color: rgba(16, 185, 129, 0.1);
+}
+
+.alert h4 {
+    margin-bottom: 0.5rem;
+    font-size: 1.1rem;
+}
+
+.alert p {
+    margin-bottom: 0;
+    font-size: 1rem;
+}
+
+/* Code Blocks */
+pre {
+    background-color: #0d1117;
+    padding: 1.5rem;
+    border-radius: 12px;
+    overflow-x: auto;
+    margin-bottom: 2rem;
+    border: 1px solid var(--border);
+    font-family: 'Fira Code', monospace;
+    font-size: 0.9rem;
+    color: #c9d1d9;
+}
+
+code {
+    font-family: 'Fira Code', monospace;
+    background-color: var(--bg-hover);
+    padding: 0.2rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.9em;
+    color: var(--secondary);
+}
+
+/* Cards */
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.card {
+    background-color: var(--bg-card);
+    padding: 1.5rem;
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+    border-color: var(--primary);
+}
+
+.card h4 {
+    color: var(--primary);
+    font-size: 1.2rem;
+    margin-bottom: 0.5rem;
+}
+
+.card p {
+    margin-bottom: 0;
+    font-size: 0.95rem;
+}
+
+/* Display LCD Simulation */
+.lcd-display {
+    background-color: #0f172a;
+    border: 4px solid #334155;
+    border-radius: 8px;
+    padding: 1rem;
+    font-family: 'Fira Code', monospace;
+    color: #4ade80; /* Green text */
+    text-shadow: 0 0 5px rgba(74, 222, 128, 0.5);
+    margin-bottom: 2rem;
+    display: inline-block;
+    box-shadow: inset 0 0 10px rgba(0,0,0,0.8);
+}
+.lcd-display div {
+    white-space: pre;
+    font-size: 1.2rem;
+}
+
+/* Badge */
+.badge {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-left: 0.5rem;
+}
+
+.badge-normal { background-color: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid #059669; }
+.badge-emergencia { background-color: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid #dc2626; }
+.badge-advertencia { background-color: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid #d97706; }
+
+@media (max-width: 768px) {
+    body {
+        flex-direction: column;
+    }
+    .sidebar {
+        width: 100%;
+        height: auto;
+        position: relative;
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+    }
+    .content {
+        margin-left: 0;
+        padding: 2rem 1rem;
+    }
+    .hero h1 {
+        font-size: 2.5rem;
+    }
+}
